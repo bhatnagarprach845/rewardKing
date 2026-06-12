@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+  build:
+    commands:
+      - echo "Building Shaded JAR..."
+      - mvn clean package -DskipTests
+  post_build:
+    commands:
+      - echo "Uploading to S3 and Updating Lambda..."
+      # 1. Upload to S3 (no 50MB limit here)
+      - aws s3 cp target/cashbackking-0.0.1-SNAPSHOT.jar s3://cashback-king-deployements/backend.jar
+      # 2. Tell Lambda to update its code from that S3 object
+      - aws lambda update-function-code --function-name cashback-king-api --s3-bucket cashback-king-deployements --s3-key backend.jar

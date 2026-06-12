@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Cashback King Serverless Backend
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        # These will be picked up by your Spring Boot application.properties
+        DB_URL: 'jdbc:postgresql://your-supabase-url:5432/postgres'
+        DB_USERNAME: 'postgres'
+        DB_PASSWORD: 'your-supabase-password'
+        RAZORPAY_KEY: 'your_razorpay_key'
+        RAZORPAY_SECRET: 'your_razorpay_secret'
+
+Resources:
+  CashbackKingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.bhatn.cashbackking.StreamLambdaHandler::handleRequest
+      Runtime: java17
+      CodeUri: .
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  CashbackKingApi:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

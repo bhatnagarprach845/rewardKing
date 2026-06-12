@@ -1,0 +1,1 @@
+[[{"type":"EVENT","pattern":"PUSH"},{"type":"FILE_PATH","pattern":"^src/.*|^pom\\.xml$"}]]

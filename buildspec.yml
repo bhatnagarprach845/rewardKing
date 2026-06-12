@@ -1,0 +1,27 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+  build:
+    commands:
+      - echo "Building Shaded JAR..."
+      - mvn clean package -DskipTests
+  post_build:
+    commands:
+      - echo "Uploading to S3 and Updating Lambda..."
+
+      # 1. Upload to S3 (Double-check bucket name and folder spelling)
+      - aws s3 cp target/cashbackking-0.0.1-SNAPSHOT.jar s3://cashback-king-deployements/deployements/cashbackking.jar
+
+      # 2. Trigger the Lambda background update sequence
+      - DEPLOY_RESPONSE=$(aws lambda update-function-code --function-name cashback-king-api --s3-bucket cashback-king-deployements --s3-key deployements/cashbackking.jar)
+
+      # 3. CORE ADDITION: Force CodeBuild to wait until the Lambda state transitions out of "InProgress"
+      - echo "Waiting for Lambda function code update to fully successfully finalize across containers..."
+      - aws lambda wait function-updated --function-name cashback-king-api
+
+      # 4. DIAGNOSTIC PRINT: Print the live function metadata directly out to CodeBuild Logs
+      - echo "Deployment complete! Verifying updated infrastructure properties:"
+      - aws lambda get-function --function-name cashback-king-api --query "Configuration.[LastModified, CodeSha256]" --output table

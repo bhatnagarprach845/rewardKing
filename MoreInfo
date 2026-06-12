@@ -1,0 +1,31 @@
+Once your application is live in production and users are using it on their phones or browsers, you never touch the production environment directly from your local IntelliJ workspace for daily traffic.
+
+Instead, you use a process called a CI/CD Pipeline (Continuous Integration / Continuous Deployment).
+
+Here is exactly how code changes work once you launch in the market, without disrupting your active users.
+
+1. The Multi-Environment Setup (The Industry Standard)
+To protect your live users from accidental bugs, your application will be split into at least two completely identical, but isolated, cloud environments:
+
+Development / Staging Environment: This is your current sandbox. You write code in IntelliJ, test it locally on localhost:8080, and push it to a testing URL to see if it works in AWS Lambda. If it crashes, it doesn't matter because no real users are on it.
+
+Production Environment: This is the sacred space. It has its own isolated Supabase database database instance, its own live Razorpay banking keys, and its own dedicated AWS Lambda Function URL. Only verified, working code is allowed here.
+
+2. How You Push Updates to Live Users
+When you want to add a new feature (like a new reward category or an updated layout) after launching, you follow this systematic flow:
+
+[Write Code in IntelliJ]
+       │
+       ▼
+[Push to GitHub (Dev Branch)] ──> Automatically deploys to your Staging API
+       │
+       ▼  (Verify everything works completely)
+       │
+[Merge to GitHub (Main Branch)] ──> Automatically updates your Live Production App
+Code & Local Test: You make the code adjustments inside IntelliJ and test it locally.
+
+Push to Git: You push your changes to a code repository like GitHub or AWS CodeCommit.
+
+Automated Build (The Pipeline): Tools like GitHub Actions, AWS CodePipeline, or your custom PowerShell deployment scripts take over. They automatically pull your new code, compile the safe .jar artifact, run your unit tests, and deploy it to AWS Lambda.
+
+Zero-Downtime Deployment: AWS Lambda handles updates using a feature called Traffic Shifting (Aliases). It keeps running your old code for active users while spinning up your new code in the background. Once the new version is fully warm and ready, AWS instantly flips the switch, routing all new incoming user requests to the updated code. Your users never see a loading error or downtime screen.

@@ -1,0 +1,35 @@
+THE 60-SECOND ELEVATOR PITCH
+
+"We've built a highly secure, lightning-fast serverless rewards ecosystem that transforms how users upload receipts and claim cashback.
+
+Instead of traditional, slow infrastructure, our platform relies on a cutting-edge AWS Lambda and Serverless Spring Boot framework. When a user snaps a picture of their receipt, the image is securely streamed, processed via asynchronous anti-fraud engines, and analyzed by automated OCR within seconds.
+
+Our system doesn't just read data--it protects it. We've built in three layers of real-time anti-fraud checks, including device EXIF inspection, automated line-item mathematical verification, and cryptographic SHA-256 fingerprinting to completely eliminate double-submissions. Once validated, it automatically updates our secure Supabase database with row-level locks, calculating a flat 3% reward instantly.
+
+It's secure, infinitely scalable, and brings the entire receipt-to-rewards lifecycle down to just a few seconds on the user's dashboard."
+
+========================================================================
+THE CORE VALUE PILLARS (HOW TO SELL IT)
+If you are presenting this to stakeholders, engineers, or investors, focus on these three distinct advantages:
+
+SEAMLESS USER EXPERIENCE
+
+Instant Gratification: Leveraging asynchronous parallel processing means users don't look at spinning loading wheels. They capture, submit, and see their rewards update seamlessly.
+
+Frictionless Capture: Native smartphone camera integration directly inside the browser () means no clunky third-party app downloads are required to get started.
+
+HIGH-PERFORMANCE SERVERLESS ARCHITECTURE
+
+Zero Infrastructure Overhead: By emulating a web server inside an AWS Lambda Payload V2 framework, the platform scales down to zero when not in use--slashing traditional hosting costs while handling infinite concurrent traffic spikes flawlessly.
+
+Enterprise-Grade Security: Fully integrated with Amazon Cognito and JWKS handshake verification, ensuring that every byte of data and every user identity descriptor is cryptographically validated before a single line of business logic runs.
+
+BULLETPROOF INTELLIGENT ANTI-FRAUD
+
+Our data layer features a strict zero-trust ingestion pipeline:
+
+Hardware Validation: Ensures the upload is a real photo taken by a legitimate smartphone, not an uploaded digital spoof.
+
+Self-Auditing AI: Automatically computes and cross-references the sum of (Quantity x Unit Price) against the stated invoice total to catch manipulated or fake receipts.
+
+Duplicate Defeating Fingerprints: Generates a unique SHA-256 hash token per receipt structure (Merchant_Total_Date), preventing users from ever uploading the same receipt twice or sharing it across accounts.

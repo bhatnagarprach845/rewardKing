@@ -1,0 +1,1 @@
+{"type": "GITHUB", "location": "https://github.com/bhatnagarprach845/cashbackKing", "buildspec": "buildspec.yml", "auth": {"type": "CODECONNECTIONS", "resource": "arn:aws:codeconnections:us-east-2:608659035826:connection/c36d5a49-3182-4111-ab37-b8617945fa75"}}

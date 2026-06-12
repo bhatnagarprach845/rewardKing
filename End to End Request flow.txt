@@ -1,0 +1,62 @@
+
+======================================================================
+II. End-to-End Request Flow (Step-by-Step)
+To see exactly how the components interact, let's look at the flow of a user uploading a receipt via FileUpload2 to earn rewards:
+
+Step 1: Client Capture and Packaging (React Frontend)
+The user clicks "Submit Photo". The frontend triggers the native smartphone camera lens using .
+
+The image data is isolated in a binary blob array, wrapped inside an axios FormData boundary stream, and paired with an encrypted Cognito ID Token appended to the Authorization: Bearer  header array.
+
+The client calls a secure POST network route target pointing to your AWS Lambda Function URL endpoints:
+POST https://...lambda-url.us-east-2.on.aws/api/v1/upload
+
+Step 2: The Infrastructure Pipeline Ingestion (AWS Lambda)
+The AWS Lambda Function URL receives the raw request stream. Because you registered multipart/form-data as an explicit binary media type wrapper, AWS wraps the request securely into a modern Payload Version 2.0 JSON framework (HttpApiV2ProxyRequest) without corrupting the raw text layout.
+
+The Lambda container spins up and routes execution straight into your defined entrypoint class: StreamLambdaHandler.java.
+
+Step 3: The Framework Emulation Layer
+Inside the handler's static block, SpringBootLambdaContainerHandler.getHttpApiV2ProxyHandler() acts as an internal adapter mock layer. It pretends to be an active web server (like Apache Tomcat).
+
+It translates the AWS V2 JSON payload properties (rawPath, headers, body) into standard Java servlet classes (HttpServletRequest and HttpServletResponse).
+
+This synthetic request is passed cleanly down into Spring Boot's native internal router: the DispatcherServlet.
+
+Step 4: Security Inspection and Authentication Filtering
+Before hitting any controller methods, the request enters your SecurityConfig.java pipeline filter chain.
+
+The jwtDecoder() extracts the Token from the header, establishes a public handshake with your Amazon Cognito JWKS keys endpoint, checks the expiration timestamps, and matches security identity descriptors.
+
+Once validated, Spring fills the context security context thread with an authenticated principal wrapper holding the unique user ID (sub).
+
+Step 5: Route Matching (Controller Layer)
+The DispatcherServlet scans your mappings and matches the request path (/api/v1/upload) to your ReceiptController.java method:
+
+@PostMapping("/upload")
+public ResponseEntity<Map<String, Object>> uploadLocal(@RequestParam("file") MultipartFile file...)
+
+The framework maps the boundary binary image streams natively to the MultipartFile variable arguments list.
+
+Step 6: Core Business Processing & Anti-Fraud Execution
+The controller delegates processing to your asynchronous engine layer inside ReceiptProcessor.java:
+
+Anti-Fraud Step A (EXIF Inspection): The service streams the image bytes through the metadata-extractor engine, ensuring valid smartphone camera make and model signatures are present.
+
+OCR Ingestion (AWS Textract): The system invokes billAnalyzer.analyze(), passing the clean byte array down to AWS Textract's AnalyzeExpense API. Textract returns structural line items, merchant tags, and cash calculations.
+
+Anti-Fraud Step B (Mathematical Verification): The application loops through every item parsed by Textract and checks if:
+Sum of (Quantity x Unit Price) is approximately equal to Total Amount
+
+Anti-Fraud Step C (Cryptographic Fingerprinting): The system assembles a unique composite key string (Merchant_Total_Date) and generates a secure SHA-256 hash token. It checks the database via existsByFingerprintHashAndIdNot() to instantly flag and reject identical double submissions.
+
+Step 7: Database Persistence & Closing the Lifecycle (Data Layer)
+If the receipt clears all security validations, the service calculates a flat 3% reward allocation.
+
+It initiates a transactional row-lock on your Supabase remote instance (findByUserIdForUpdate), adds the calculated cashback to the user's UserWallet, and saves an audit record to CashbackTransaction.
+
+The method builds an HttpStatus.OK container mapping payload, and the Serverless Java Container translates it back into an AWS Lambda proxy output body string.
+
+The Lambda function ends its lifecycle instance invocation, returning a clean success string to the user's dashboard!
+
+======================================================================

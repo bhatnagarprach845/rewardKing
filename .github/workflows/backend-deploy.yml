@@ -18,4 +18,4 @@ jobs:
 
       - name: Run AWS CodeBuild
         run: |
-          aws codebuild start-build --project-name Reward-king-backend-build
+          aws codebuild start-build --project-name rewardKing-build

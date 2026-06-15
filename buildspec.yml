@@ -6,7 +6,7 @@ phases:
       java: corretto17
   build:
     commands:
-      - echo "Building Shaded JAR..."
+      - echo "Building Shaded JAR...."
       - mvn clean package -DskipTests
   post_build:
     commands:

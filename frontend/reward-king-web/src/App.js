@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { syncUserWithBackend } from './api/RewardApi';
+import { syncUserWithBackend } from './api/rewardApi';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { Authenticator } from '@aws-amplify/ui-react';
 import { Amplify } from 'aws-amplify';

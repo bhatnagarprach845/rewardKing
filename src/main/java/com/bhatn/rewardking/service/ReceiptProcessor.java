@@ -39,7 +39,7 @@ public class ReceiptProcessor {
     private final BillAnalyzer billAnalyzer;
     private final S3Client s3Client;
 
-    // Self-inject proxy to ensure internal invocations respect @Transactional boundaries
+    //// Self-inject proxy to ensure internal invocations respect @Transactional boundaries
     private final ReceiptProcessor self;
 
     @Value("${Reward.rate:0.03}")

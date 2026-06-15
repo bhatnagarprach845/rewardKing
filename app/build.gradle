@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace 'com.bhatn.cashbackking'
+    namespace 'com.bhatn.rewardking'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.bhatn.cashbackking"
+        applicationId "com.bhatn.rewardking"
         minSdk 24
         targetSdk 34
         versionCode 1

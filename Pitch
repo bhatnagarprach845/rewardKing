@@ -1,6 +1,6 @@
 THE 60-SECOND ELEVATOR PITCH
 
-"We've built a highly secure, lightning-fast serverless rewards ecosystem that transforms how users upload receipts and claim cashback.
+"We've built a highly secure, lightning-fast serverless rewards ecosystem that transforms how users upload receipts and claim Reward.
 
 Instead of traditional, slow infrastructure, our platform relies on a cutting-edge AWS Lambda and Serverless Spring Boot framework. When a user snaps a picture of their receipt, the image is securely streamed, processed via asynchronous anti-fraud engines, and analyzed by automated OCR within seconds.
 

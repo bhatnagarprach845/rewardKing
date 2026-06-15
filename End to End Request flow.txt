@@ -53,7 +53,7 @@ Anti-Fraud Step C (Cryptographic Fingerprinting): The system assembles a unique 
 Step 7: Database Persistence & Closing the Lifecycle (Data Layer)
 If the receipt clears all security validations, the service calculates a flat 3% reward allocation.
 
-It initiates a transactional row-lock on your Supabase remote instance (findByUserIdForUpdate), adds the calculated cashback to the user's UserWallet, and saves an audit record to CashbackTransaction.
+It initiates a transactional row-lock on your Supabase remote instance (findByUserIdForUpdate), adds the calculated Reward to the user's UserWallet, and saves an audit record to RewardTransaction.
 
 The method builds an HttpStatus.OK container mapping payload, and the Serverless Java Container translates it back into an AWS Lambda proxy output body string.
 

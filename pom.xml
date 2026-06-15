@@ -11,10 +11,10 @@
     </parent>
 
     <groupId>com.bhatn</groupId>
-    <artifactId>cashbackking</artifactId>
+    <artifactId>rewardking</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>cashbackking</name>
-    <description>Cashback application with AWS and Razorpay</description>
+    <name>rewardking</name>
+    <description>Reward application with AWS and Razorpay</description>
 
     <properties>
         <java.version>17</java.version>

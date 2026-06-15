@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Cashback King Serverless Backend
+Description: Reward King Serverless Backend
 
 Globals:
   Function:
@@ -16,10 +16,10 @@ Globals:
         RAZORPAY_SECRET: 'your_razorpay_secret'
 
 Resources:
-  CashbackKingFunction:
+  RewardKingFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: com.bhatn.cashbackking.StreamLambdaHandler::handleRequest
+      Handler: com.bhatn.rewardking.StreamLambdaHandler::handleRequest
       Runtime: java17
       CodeUri: .
       Events:
@@ -30,6 +30,6 @@ Resources:
             Method: ANY
 
 Outputs:
-  CashbackKingApi:
+  rewardkingApi:
     Description: "API Gateway endpoint URL for Prod stage"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

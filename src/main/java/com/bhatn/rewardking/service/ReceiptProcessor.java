@@ -39,8 +39,10 @@ public class ReceiptProcessor {
     private final BillAnalyzer billAnalyzer;
     private final S3Client s3Client;
 
-    //// Self-inject proxy to ensure internal invocations respect @Transactional boundaries
-    private final ReceiptProcessor self;
+    // REMOVE 'final' here so Lombok ignores it in the constructor
+    @org.springframework.context.annotation.Lazy
+    @org.springframework.beans.factory.annotation.Autowired
+    private ReceiptProcessor self;
 
     @Value("${Reward.rate:0.03}")
     private BigDecimal RewardRate;

@@ -5,13 +5,13 @@ import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.repository.UserRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j; // FIX 1: Explicitly import Lombok's logger backend
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-@Configuration
+@Component
 @RequiredArgsConstructor
 @Slf4j // FIX 2: Added annotation to dynamically inject the 'log' handle bean instance
 @Profile("default")

@@ -5,7 +5,6 @@ C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\servic
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\SecurityConfig.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\controller\RazorpayWebhookController.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\CorsFilter.java
-C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\SeedUserConfig.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\repository\WalletRepository.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\entity\User.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\repository\RewardTransactionRepository.java

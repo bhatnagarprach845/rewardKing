@@ -9,8 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "users")
 @Data
@@ -28,19 +26,6 @@ public class User {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(length = 100)
-    private String upiId; // User's primary/active VPA for the current payout processing runtime
 
-    @Column(length = 100)
-    private String selectedUpi; // Tracks the current active radio selection choice on the dashboard UI
-
-    @Column(length = 50)
-    private String razorpayContactId; // Required for RazorpayX Payouts
-
-    // Field for Razorpay optimization
-    private String razorpayFundAccountId;
-
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
 
 }

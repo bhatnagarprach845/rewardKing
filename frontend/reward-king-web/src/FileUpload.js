@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-const FileUploadLocal = (props) => {
+const FileUpload = (props) => {
     const [file, setFile] = useState(null);
     const [preview, setPreview] = useState(null);
     const [status, setStatus] = useState("Idle");

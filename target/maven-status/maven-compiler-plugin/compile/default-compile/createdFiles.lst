@@ -22,9 +22,7 @@ com\bhatn\rewardking\entity\Receipt.class
 com\bhatn\rewardking\entity\ReceiptItem.class
 com\bhatn\rewardking\config\SecurityConfig.class
 com\bhatn\rewardking\dto\PayoutStatusResponse$TransactionDTO$TransactionDTOBuilder.class
-com\bhatn\rewardking\dto\UserResponse_del.class
 com\bhatn\rewardking\repository\RewardTransactionRepository.class
-com\bhatn\rewardking\dto\UserResponse_del$UserResponse_delBuilder.class
 com\bhatn\rewardking\service\WalletService.class
 com\bhatn\rewardking\service\UserService.class
 com\bhatn\rewardking\dto\ExtractionResult$LineItemDTO.class
@@ -37,7 +35,6 @@ com\bhatn\rewardking\controller\UserController.class
 com\bhatn\rewardking\config\CorsFilter.class
 com\bhatn\rewardking\dto\PayoutStatusResponse.class
 com\bhatn\rewardking\entity\ReceiptStatus.class
-com\bhatn\rewardking\dto\BillRequest_del.class
 com\bhatn\rewardking\entity\UserWallet$UserWalletBuilder.class
 com\bhatn\rewardking\dto\AdminWalletDTO$AdminWalletDTOBuilder.class
 com\bhatn\rewardking\config\RazorpayConfig.class

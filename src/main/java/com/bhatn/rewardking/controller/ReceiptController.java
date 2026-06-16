@@ -1,8 +1,9 @@
 package com.bhatn.rewardking.controller;
 
 import com.bhatn.rewardking.dto.ExtractionResult;
-import com.bhatn.rewardking.dto.PayoutStatusResponse;
-import com.bhatn.rewardking.entity.*;
+import com.bhatn.rewardking.entity.Receipt;
+import com.bhatn.rewardking.entity.ReceiptItem;
+import com.bhatn.rewardking.entity.ReceiptStatus;
 import com.bhatn.rewardking.repository.ReceiptRepository;
 import com.bhatn.rewardking.service.ReceiptProcessor;
 import com.bhatn.rewardking.service.RewardService;
@@ -125,7 +126,7 @@ public class ReceiptController {
     /**
      * 3. Points Status Aggregator Endpoint (Connects straight to your updated RewardStore dashboard)
      */
-    @GetMapping("/payout-status")
+   /* @GetMapping("/payout-status")
     public ResponseEntity<PayoutStatusResponse> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getClaimAsString("sub");
         if (username == null) {
@@ -135,7 +136,7 @@ public class ReceiptController {
         // Handoff directly to your revised RewardService business layer instance
         PayoutStatusResponse response = rewardService.getUserPointsDashboard(username);
         return ResponseEntity.ok(response);
-    }
+    }*/
 
     @GetMapping("/version")
     public String version() {

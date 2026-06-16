@@ -1,5 +1,4 @@
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\entity\ReceiptItem.java
-C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\UserResponse_del.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\ExtractionResult.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\PayoutDTO.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\service\ocr\BillAnalyzer.java
@@ -14,7 +13,6 @@ C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\Pa
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\controller\AdminController.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\WebConfig.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\controller\DebugController.java
-C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\BillRequest_del.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\repository\ReceiptRepository.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\entity\Receipt.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\AWSConfig.java

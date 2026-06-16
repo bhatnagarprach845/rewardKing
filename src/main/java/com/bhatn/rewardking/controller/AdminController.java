@@ -2,9 +2,12 @@ package com.bhatn.rewardking.controller;
 
 import com.bhatn.rewardking.dto.AdminWalletDTO;
 import com.bhatn.rewardking.dto.PayoutDTO;
-import com.bhatn.rewardking.entity.*;
-import com.bhatn.rewardking.repository.RewardTransactionRepository;
+import com.bhatn.rewardking.entity.Receipt;
+import com.bhatn.rewardking.entity.RewardTransaction;
+import com.bhatn.rewardking.entity.User;
+import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.repository.ReceiptRepository;
+import com.bhatn.rewardking.repository.RewardTransactionRepository;
 import com.bhatn.rewardking.repository.UserRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
 import com.bhatn.rewardking.service.payment_del.PayoutService;
@@ -16,14 +19,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-//@CrossOrigin(origins = "https://feature-initialcommit.dwp81oqt95zeu.amplifyapp.com")
 public class AdminController {
 
     private final WalletRepository walletRepository;
@@ -64,7 +65,7 @@ public class AdminController {
         BigDecimal amount = payload.get("amount");
 
         // Trigger the Razorpay payout — get back the Razorpay payout reference ID
-        String rzpId = payoutService.triggerPayout(user, amount);
+        //String rzpId = payoutService.triggerPayout(user, amount);
 
         // Record the transaction as APPROVED and store the Razorpay reference.
         // Wallet deduction is deferred to the webhook (RazorpayWebhookController).
@@ -72,12 +73,12 @@ public class AdminController {
         tx.setUserId(userId);
         tx.setAmountAwarded(amount.negate()); // Store as negative to indicate a withdrawal
         tx.setStatus(com.bhatn.rewardking.entity.RewardTransaction.TransactionStatus.APPROVED);
-        tx.setRazorpayPayoutId(rzpId);
+        //tx.setRazorpayPayoutId(rzpId);
         tx.setProcessedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
-        return ResponseEntity.ok("Payout initiated. Razorpay ID: " + rzpId
-                + ". Wallet will be updated once Razorpay confirms via webhook.");
+        return ResponseEntity.ok("Payout initiated. Razorpay ID: " + //rzpId
+                 ". Wallet will be updated once Razorpay confirms via webhook.");
     }
 
     /**
@@ -93,16 +94,16 @@ public class AdminController {
 
         BigDecimal positiveAmount = req.getAmountAwarded().abs();
         // 1. Call Razorpay
-        String rzpPayoutId = payoutService.triggerPayout(user, positiveAmount);
+        //String rzpPayoutId = payoutService.triggerPayout(user, positiveAmount);
 
         // 2. Mark the transaction as APPROVED and record the Razorpay reference.
         //    Wallet deduction now happens in RazorpayWebhookController on "payout.processed".
         req.setStatus(RewardTransaction.TransactionStatus.APPROVED);
-        req.setRazorpayPayoutId(rzpPayoutId);
+        //req.setRazorpayPayoutId(rzpPayoutId);
         req.setProcessedAt(LocalDateTime.now());
         transactionRepository.save(req);
 
-        return ResponseEntity.ok("Payout submitted to Razorpay. ID: " + rzpPayoutId
+        return ResponseEntity.ok("Payout submitted to Razorpay. ID: " //+ rzpPayoutId
                 + ". Wallet will be debited once Razorpay confirms via webhook.");
     }
 

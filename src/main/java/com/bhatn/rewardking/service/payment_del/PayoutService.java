@@ -1,50 +1,43 @@
 package com.bhatn.rewardking.service.payment_del;
 
-import com.bhatn.rewardking.entity.User;
 import com.bhatn.rewardking.repository.UserRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
-import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PayoutService {
 
-    @Value("${razorpay.key.id}")
+  /*  @Value("${razorpay.key.id}")
     private String apiKey;
 
     @Value("${razorpay.key.secret}")
     private String apiSecret;
 
     @Value("${razorpay.account.number}")
-    private String razorpayAccountNumber;
+    private String razorpayAccountNumber;*/
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final UserRepository userRepository;
 
     private static final String BASE_URL = "https://api.razorpay.com/v1";
 
-    @PostConstruct
+   /* @PostConstruct
     public void init() {
         log.info("PayoutService loaded successfully. Environment Key Mask: {}",
                 (apiKey != null && apiKey.length() > 8) ? apiKey.substring(0, 8) + "..." : "NULL");
         if (apiKey == null || apiKey.isEmpty()) {
             log.error("CRITICAL CONFIGURATION ERROR: Razorpay API Key is missing from environment layout properties!");
         }
-    }
+    }*/
 
     /**
      * Core operational trigger initiating cash reward transfers out to the destination layer.
      */
-    public String triggerPayout(User user, BigDecimal amount) {
+   /* public String triggerPayout(User user, BigDecimal amount) {
         // 1. Validation Check: Razorpay mechanical lower boundary is 100 paise (₹1.00)
         if (amount == null || amount.compareTo(BigDecimal.ONE) < 0) {
             throw new IllegalArgumentException("Payout processing failed: Minimum disbursement limit must be at least ₹1.00");
@@ -56,7 +49,7 @@ public class PayoutService {
 
             // Create RazorpayX Payout payload model mapping
             JSONObject payoutRequest = new JSONObject();
-            payoutRequest.put("account_number", String.valueOf(razorpayAccountNumber));
+           // payoutRequest.put("account_number", String.valueOf(razorpayAccountNumber));
             payoutRequest.put("fund_account_id", fundId);
             payoutRequest.put("amount", amount.multiply(new BigDecimal(100)).intValue()); // Convert to Paise
             payoutRequest.put("currency", "INR");
@@ -76,11 +69,11 @@ public class PayoutService {
             throw new RuntimeException(e.getMessage());
         }
     }
-
+*/
     /**
      * Resolves localized caching mappings or executes remote account creations securely.
      */
-    public String getOrCreateFundAccountId(User user) {
+    /*public String getOrCreateFundAccountId(User user) {
         try {
             // 1. Caching Optimization: If database already contains verified identifiers, reuse instantly
             if (user.getRazorpayFundAccountId() != null && !user.getRazorpayFundAccountId().isEmpty()) {
@@ -179,11 +172,11 @@ public class PayoutService {
             throw new RuntimeException("Failed to register UPI mapping criteria with Razorpay gateway: " + e.getMessage());
         }
     }
-
+*/
     /**
      * Standard internal transactional HTTP execution handler abstracting basic authentication configurations safely.
      */
-    private JSONObject postToRazorpay(String url, JSONObject payload) {
+   /* private JSONObject postToRazorpay(String url, JSONObject payload) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBasicAuth(apiKey, apiSecret);
@@ -203,5 +196,5 @@ public class PayoutService {
             log.error("Unexpected network failure accessing endpoints layer mapping context:", e);
             throw new RuntimeException("External communication transport layout error: " + e.getMessage());
         }
-    }
+    }*/
 }

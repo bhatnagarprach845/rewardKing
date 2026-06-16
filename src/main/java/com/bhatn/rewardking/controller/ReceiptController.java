@@ -203,7 +203,7 @@ public class ReceiptController {
             }
 
             user.setUpiId(targetUpi);
-            payoutService.getOrCreateFundAccountId(user);
+            //payoutService.getOrCreateFundAccountId(user);
 
             if (user.getUpiIds() == null) {
                 user.setUpiIds(new ArrayList<>());

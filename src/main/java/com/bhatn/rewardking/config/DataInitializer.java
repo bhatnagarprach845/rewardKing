@@ -5,6 +5,7 @@ import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.repository.UserRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // FIX 1: Explicitly import Lombok's logger backend
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -12,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Configuration
 @RequiredArgsConstructor
-@Profile("default") // This runs when you start the app locally
+@Slf4j // FIX 2: Added annotation to dynamically inject the 'log' handle bean instance
+@Profile("default")
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepo;
@@ -22,7 +24,7 @@ public class DataInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         String localId = "local-user";
-        
+
         if (!userRepo.existsById(localId)) {
             User user = User.builder()
                     .cognitoId(localId)
@@ -33,11 +35,16 @@ public class DataInitializer implements CommandLineRunner {
 
             UserWallet wallet = UserWallet.builder()
                     .userId(localId)
-                    .availablePoints(100) // Start with some test money
+                    .fullName("Prachi Bhatnagar") // Enriched for dashboard responses
+                    .email("prachi@example.com")
+                    .availablePoints(100L) // Casted cleanly to primitive long tracking
                     .build();
             walletRepo.save(wallet);
-            
-            System.out.println("Prachi :: Local test user and wallet initialized.");
+
+            log.info("Prachi :: Local test user and wallet initialized safely.");
+        }
+        else {
+            log.info("Prachi :: Local test profile already present in database. Skipping data seed.");
         }
     }
 }

@@ -10,8 +10,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-
 @Configuration
 @RequiredArgsConstructor
 @Profile("default") // This runs when you start the app locally
@@ -35,7 +33,7 @@ public class DataInitializer implements CommandLineRunner {
 
             UserWallet wallet = UserWallet.builder()
                     .userId(localId)
-                    .currentBalance(new BigDecimal("100.00")) // Start with some test money
+                    .availablePoints(100) // Start with some test money
                     .build();
             walletRepo.save(wallet);
             

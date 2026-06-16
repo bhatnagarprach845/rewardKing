@@ -1,24 +1,9 @@
 package com.bhatn.rewardking.controller;
 
-import com.bhatn.rewardking.entity.RewardTransaction;
-import com.bhatn.rewardking.entity.UserWallet;
-import com.bhatn.rewardking.repository.RewardTransactionRepository;
-import com.bhatn.rewardking.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.util.HexFormat;
-import java.util.Optional;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/webhooks/razorpay")
@@ -26,7 +11,7 @@ import java.util.Optional;
 @Slf4j
 public class RazorpayWebhookController {
 
-    private final RewardTransactionRepository transactionRepository;
+   /* private final RewardTransactionRepository transactionRepository;
     private final WalletRepository walletRepository;
 
     // The colon at the end means "default to empty string if env var is not set".
@@ -35,7 +20,7 @@ public class RazorpayWebhookController {
     @Value("${razorpay.webhook.secret:}")
     private String webhookSecret;
 
-    /**
+    *//**
      * Handles all incoming Razorpay payout webhook events.
      *
      * FIX (Critical): This is now the SINGLE place where wallet balances are
@@ -49,7 +34,7 @@ public class RazorpayWebhookController {
      *
      * FIX (Critical): Added HMAC-SHA256 signature verification so that only
      * genuine Razorpay events can mutate wallet balances.
-     */
+     *//*
     @PostMapping
     public ResponseEntity<String> handleWebhook(
             @RequestBody String payload,
@@ -108,11 +93,11 @@ public class RazorpayWebhookController {
         }
     }
 
-    /**
+    *//**
      * Deducts the payout amount from the user's wallet.
      * Uses a pessimistic write lock (via findByUserIdForUpdate) to prevent
      * race conditions with concurrent wallet operations.
-     */
+     *//*
     private void deductWallet(RewardTransaction tx) {
         UserWallet wallet = walletRepository.findByUserIdForUpdate(tx.getUserId())
                 .orElseThrow(() -> new RuntimeException("Wallet not found for user: " + tx.getUserId()));
@@ -133,9 +118,9 @@ public class RazorpayWebhookController {
         walletRepository.save(wallet);
     }
 
-    /**
+    *//**
      * Refunds a failed payout amount back to the user's wallet.
-     */
+     *//*
     private void refundWallet(RewardTransaction tx) {
         Optional<UserWallet> walletOpt = walletRepository.findByUserIdForUpdate(tx.getUserId());
         if (walletOpt.isEmpty()) {
@@ -149,14 +134,14 @@ public class RazorpayWebhookController {
         walletRepository.save(wallet);
     }
 
-    /**
+    *//**
      * Verifies the HMAC-SHA256 signature that Razorpay sends with every webhook.
      * Razorpay signs the raw request body with the webhook secret.
      *
      * If RAZORPAY_WEBHOOK_SECRET is not configured (e.g. local dev before the
      * Razorpay webhook is set up), verification is skipped with a warning.
      * NEVER leave the secret unset in production.
-     */
+     *//*
     private boolean isSignatureValid(String payload, String signature) {
         // Dev/test bypass: if no secret is configured, skip verification but warn loudly
         if (webhookSecret == null || webhookSecret.isBlank()) {
@@ -183,4 +168,4 @@ public class RazorpayWebhookController {
             return false;
         }
     }
-}
+*/}

@@ -7,8 +7,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-
 @Configuration
 public class SeedUserConfig {
     @Bean
@@ -18,7 +16,7 @@ public class SeedUserConfig {
             if (repository.findByUserId("local-user").isEmpty()) {
                 repository.save(UserWallet.builder()
                         .userId("local-user")
-                        .currentBalance(BigDecimal.ZERO)
+                                .availablePoints(100)
                         .build());
                 System.out.println("Seed user 'local-user' created.");
             }

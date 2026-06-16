@@ -2,6 +2,7 @@ package com.bhatn.rewardking.service;
 
 import com.bhatn.rewardking.dto.ExtractionResult;
 import com.bhatn.rewardking.entity.*;
+import com.bhatn.rewardking.entity.RewardTransaction.TransactionStatus;
 import com.bhatn.rewardking.repository.ReceiptRepository;
 import com.bhatn.rewardking.repository.RewardTransactionRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
@@ -39,21 +40,20 @@ public class ReceiptProcessor {
     private final BillAnalyzer billAnalyzer;
     private final S3Client s3Client;
 
-    // REMOVE 'final' here so Lombok ignores it in the constructor
     @org.springframework.context.annotation.Lazy
     @org.springframework.beans.factory.annotation.Autowired
     private ReceiptProcessor self;
 
-    @Value("${Reward.rate:0.03}")
-    private BigDecimal RewardRate;
+    // We can track your points scale multiplier rule from property configurations
+    // e.g., 10 points per 100 currency units spent
+    @Value("${Reward.points.multiplier:10}")
+    private long pointsMultiplier;
 
     /**
      * Orchestrates network/OCR operations asynchronously.
-     * REMOVED @Transactional: Keeps S3 and OCR processing outside DB connection lifecycle.
      */
     @Async
     public void processRewardAsync(Long receiptId, String bucket, String key) {
-        // Fetch initially to verify existence; uses a short-lived read transaction via repo
         Receipt receipt = receiptRepository.findById(receiptId)
                 .orElseThrow(() -> new RuntimeException("Receipt not found"));
 
@@ -68,14 +68,12 @@ public class ReceiptProcessor {
 
             ExtractionResult result = billAnalyzer.analyze(imageBytes);
 
-            // Guard against total failure of OCR extraction to prevent downstream NPEs
             if (result == null || result.getTotalAmount() == null || result.getMerchantName() == null) {
                 log.warn("OCR Parsing failed completely for receipt {}. Flagging for review.", receiptId);
                 self.updateReceiptStatus(receiptId, ReceiptStatus.FLAGGED_FOR_REVIEW);
                 return;
             }
 
-            // Delegate state changes and rewards logic to an isolated write transaction via proxy
             self.executeRewardAllocation(receiptId, result);
 
         } catch (Exception e) {
@@ -122,9 +120,6 @@ public class ReceiptProcessor {
         processReward(receipt);
     }
 
-    /**
-     * Fallback utility to safely save execution status transitions on failure.
-     */
     @Transactional
     public void updateReceiptStatus(Long receiptId, ReceiptStatus status) {
         receiptRepository.findById(receiptId).ifPresent(receipt -> {
@@ -134,7 +129,6 @@ public class ReceiptProcessor {
         });
     }
 
-    // Unmodified core business rule methods (processReward, isDuplicate, etc.) kept intact
     @Transactional
     public void processReward(Receipt receipt) {
         String currentFingerprint = calculateFingerprintHash(receipt);
@@ -167,30 +161,30 @@ public class ReceiptProcessor {
             return;
         }
 
-        BigDecimal RewardAmount = receipt.getTotalAmount()
-                .multiply(RewardRate)
-                .setScale(2, BigDecimal.ROUND_HALF_UP);
+        // FIX 1: Convert receipt currency total to a clean points integer count
+        // Example: a ₹150 receipt multiplied by a 10pt rule allocates 15 points
+        long pointsAwarded = Math.max(1, receipt.getTotalAmount().longValue() * pointsMultiplier / 100);
 
-        log.info("Awarding Reward of ₹{} ({}% of ₹{}) for receipt {}",
-                RewardAmount,
-                RewardRate.multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString(),
-                receipt.getTotalAmount(),
-                receipt.getId());
+        log.info("Awarding {} loyalty points for receipt {} from merchant {}",
+                pointsAwarded, receipt.getId(), receipt.getMerchantName());
 
         UserWallet wallet = walletRepository.findByUserIdForUpdate(receipt.getUserId())
-                .orElseGet(() -> UserWallet.builder().userId(receipt.getUserId()).build());
+                .orElseGet(() -> UserWallet.builder().userId(receipt.getUserId()).availablePoints(0L).build());
 
-        wallet.addBalance(RewardAmount);
+        // FIX 2: Switched to use your new point-store entity setter method
+        wallet.addPoints(pointsAwarded);
         walletRepository.save(wallet);
 
+        // FIX 3: Rewritten to support updated points entity constructor parameters
         RewardTransaction tx = RewardTransaction.builder()
+                .id(null) // Handled automatically by database identity auto-increment strategies
                 .receiptId(receipt.getId())
                 .userId(receipt.getUserId())
-                .amountAwarded(RewardAmount)
+                .pointsAmount(pointsAwarded)
+                .type("EARNED")
                 .processedAt(LocalDateTime.now())
-                .status(RewardTransaction.TransactionStatus.COMPLETED)
-                .remarks(RewardRate.multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString()
-                        + "% reward: " + receipt.getMerchantName())
+                .status(TransactionStatus.COMPLETED)
+                .notes("Points credit: " + receipt.getMerchantName())
                 .build();
         transactionRepository.save(tx);
 
@@ -200,7 +194,6 @@ public class ReceiptProcessor {
 
     private String calculateFingerprintHash(Receipt receipt) {
         try {
-            // Defend against null components to prevent a NullPointerException
             String merchant = receipt.getMerchantName() != null ? receipt.getMerchantName() : "UNKNOWN";
             String amount = receipt.getTotalAmount() != null
                     ? receipt.getTotalAmount().setScale(2, BigDecimal.ROUND_HALF_UP).toPlainString()

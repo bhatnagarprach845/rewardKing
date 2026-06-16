@@ -1,21 +1,13 @@
 package com.bhatn.rewardking.service;
 
-import com.bhatn.rewardking.entity.RewardTransaction;
-import com.bhatn.rewardking.entity.UserWallet;
-import com.bhatn.rewardking.repository.RewardTransactionRepository;
-import com.bhatn.rewardking.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
 public class WalletService {
 
-    private final WalletRepository walletRepository;
+    /*private final WalletRepository walletRepository;
     private final RewardTransactionRepository transactionRepository;
 
     @Transactional
@@ -39,14 +31,14 @@ public class WalletService {
         transactionRepository.save(payoutRecord);
         return ResponseEntity.ok("Request sent for Admin approval.");
 
-       /* // 4. Update the Wallet Balance (Subtract ONLY the requested amount)
+       *//* // 4. Update the Wallet Balance (Subtract ONLY the requested amount)
         BigDecimal newBalance = wallet.getCurrentBalance().subtract(amountToRedeem);
         wallet.setCurrentBalance(newBalance);
         wallet.setLastUpdated(java.time.LocalDateTime.now());
         walletRepository.save(wallet);
 
         // Note: We no longer need to loop through and "Settle" old COMPLETED transactions
-        // because the currentBalance now correctly tracks the running total.*/
+        // because the currentBalance now correctly tracks the running total.*//*
     }
     @Transactional
     public void confirmPayoutSuccess(String payoutId) {
@@ -79,7 +71,7 @@ public class WalletService {
         });
     }
 
-    /*@Transactional
+    *//*@Transactional
     public void initiateManualRedemption(String userId, BigDecimal amountToRedeem) {
         // 1. Fetch the wallet
         UserWallet wallet = walletRepository.findByUserIdForUpdate(userId)
@@ -118,5 +110,5 @@ public class WalletService {
                 .status(Transaction.TransactionStatus.PENDING)
                 .payoutId(externalPayoutId)
                 .build());
-    }*/
-    }
+    }*//*
+*/    }

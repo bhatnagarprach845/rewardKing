@@ -10,13 +10,11 @@ import com.bhatn.rewardking.repository.ReceiptRepository;
 import com.bhatn.rewardking.repository.RewardTransactionRepository;
 import com.bhatn.rewardking.repository.UserRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
-import com.bhatn.rewardking.service.payment_del.PayoutService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -31,98 +29,23 @@ public class AdminController {
     private final UserRepository userRepository;
     private final ReceiptRepository receiptRepository;
     private final RewardTransactionRepository transactionRepository;
-    private final PayoutService payoutService;
 
+    /**
+     * Fetch all historical transactions logged in the ecosystem.
+     */
     @GetMapping("/transactions")
-    public List<com.bhatn.rewardking.entity.RewardTransaction> getAllTransactions() {
-        // This will return everything: COMPLETED (earnings) and REDEEMED (payouts)
+    public List<RewardTransaction> getAllTransactions() {
         return transactionRepository.findAll();
     }
 
     /**
-     * Initiates a manual payout for a user.
-     *
-     * FIX (Critical): The wallet balance is NO LONGER zeroed here.
-     * Previously the balance was reset to zero immediately after calling Razorpay,
-     * meaning a Razorpay failure would silently wipe the user's balance with no refund path.
-     *
-     * The correct flow is:
-     *   1. Record the transaction as APPROVED (intent).
-     *   2. Trigger Razorpay — get a payout ID.
-     *   3. Store the Razorpay payout ID on the transaction.
-     *   4. The wallet deduction happens ONLY inside RazorpayWebhookController
-     *      when "payout.processed" is confirmed, OR the balance is refunded on
-     *      "payout.reversed" / "payout.failed".
-     */
-    @PostMapping("/payouts/initiate/{userId}")
-    public ResponseEntity<String> initiatePayout(
-            @PathVariable String userId,
-            @RequestBody Map<String, BigDecimal> payload) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        BigDecimal amount = payload.get("amount");
-
-        // Trigger the Razorpay payout — get back the Razorpay payout reference ID
-        //String rzpId = payoutService.triggerPayout(user, amount);
-
-        // Record the transaction as APPROVED and store the Razorpay reference.
-        // Wallet deduction is deferred to the webhook (RazorpayWebhookController).
-        com.bhatn.rewardking.entity.RewardTransaction tx = new RewardTransaction();
-        tx.setUserId(userId);
-        tx.setAmountAwarded(amount.negate()); // Store as negative to indicate a withdrawal
-        tx.setStatus(com.bhatn.rewardking.entity.RewardTransaction.TransactionStatus.APPROVED);
-        //tx.setRazorpayPayoutId(rzpId);
-        tx.setProcessedAt(LocalDateTime.now());
-        transactionRepository.save(tx);
-
-        return ResponseEntity.ok("Payout initiated. Razorpay ID: " + //rzpId
-                 ". Wallet will be updated once Razorpay confirms via webhook.");
-    }
-
-    /**
-     * Approves an existing PENDING redemption request and sends it to Razorpay.
-     *
-     * FIX (Critical): Wallet deduction moved to webhook handler.
-     * Previously the balance was subtracted here before Razorpay confirmed success.
-     */
-    @PostMapping("/payouts/approve/{requestId}")
-    public ResponseEntity<String> approvePayout(@PathVariable Long requestId) {
-        RewardTransaction req = transactionRepository.findById(requestId).orElseThrow();
-        User user = userRepository.findById(req.getUserId()).orElseThrow();
-
-        BigDecimal positiveAmount = req.getAmountAwarded().abs();
-        // 1. Call Razorpay
-        //String rzpPayoutId = payoutService.triggerPayout(user, positiveAmount);
-
-        // 2. Mark the transaction as APPROVED and record the Razorpay reference.
-        //    Wallet deduction now happens in RazorpayWebhookController on "payout.processed".
-        req.setStatus(RewardTransaction.TransactionStatus.APPROVED);
-        //req.setRazorpayPayoutId(rzpPayoutId);
-        req.setProcessedAt(LocalDateTime.now());
-        transactionRepository.save(req);
-
-        return ResponseEntity.ok("Payout submitted to Razorpay. ID: " //+ rzpPayoutId
-                + ". Wallet will be debited once Razorpay confirms via webhook.");
-    }
-
-    /**
-     * Returns all PENDING and REDEEMED payout requests for the admin dashboard.
-     *
-     * FIX (High): Eliminated N+1 query. Previously userRepository.findById() was
-     * called inside the stream for every transaction row. Now all relevant users
-     * are fetched in a single query and looked up from a Map.
+     * Returns points redemption history logs for administrative dashboard views.
      */
     @GetMapping("/payouts")
     public List<PayoutDTO> getRedeemedHistory() {
-        List<RewardTransaction.TransactionStatus> actionableStatuses =
-                List.of(RewardTransaction.TransactionStatus.PENDING,
-                        RewardTransaction.TransactionStatus.REDEEMED);
+        // OPTIMIZATION: Switched to repository filtering to keep memory footprints safe
+        List<RewardTransaction> redemptions = transactionRepository.findByType("REDEEMED");
 
-        List<RewardTransaction> redemptions = transactionRepository.findByStatusIn(actionableStatuses);
-
-        // Batch-fetch all users needed for this result set in one query
         List<String> userIds = redemptions.stream().map(RewardTransaction::getUserId).distinct().toList();
         Map<String, User> userMap = userRepository.findAllById(userIds)
                 .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
@@ -133,48 +56,43 @@ public class AdminController {
                     .id(tx.getId())
                     .userId(tx.getUserId())
                     .userName(user != null ? user.getName() : "Unknown User")
-                    .amountAwarded(tx.getAmountAwarded())
+                    .amountAwarded(tx.getPointsAmount())
                     .processedAt(tx.getProcessedAt())
-                    .status(tx.getStatus().toString())
+                    .status(tx.getStatus() != null ? tx.getStatus().name() : "COMPLETED")
                     .build();
         }).toList();
     }
 
     /**
-     * Exports a CSV of all redeemed payouts.
-     *
-     * FIX (High): Batch-fetches users instead of querying per-row.
+     * Exports a clean CSV compilation of catalog item redemptions.
      */
     @GetMapping("/payouts/report")
     public ResponseEntity<String> exportPayoutsCsv() {
-        // Specifically fetch only the redemptions for a payout report
-        List<RewardTransaction> redemptions = transactionRepository.findByStatus(
-                RewardTransaction.TransactionStatus.REDEEMED);
+        List<RewardTransaction> redemptions = transactionRepository.findByType("REDEEMED");
 
         List<String> userIds = redemptions.stream().map(RewardTransaction::getUserId).distinct().toList();
         Map<String, User> userMap = userRepository.findAllById(userIds)
                 .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
 
         StringBuilder csv = new StringBuilder();
-        csv.append("User ID,Amount Redeemed,Processed Date\n");
+        csv.append("User Name,Points Redeemed,Item Details,Processed Date\n");
 
         for (RewardTransaction tx : redemptions) {
             User user = userMap.get(tx.getUserId());
             csv.append(user != null ? user.getName() : "Unknown User").append(",")
-                    .append(tx.getAmountAwarded()).append(",")
+                    .append(tx.getPointsAmount()).append(",")
+                    .append(tx.getNotes() != null ? tx.getNotes().replace(",", ";") : "N/A").append(",")
                     .append(tx.getProcessedAt()).append("\n");
         }
 
         return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=payout_history.csv")
+                .header("Content-Disposition", "attachment; filename=points_redemption_history.csv")
                 .header("Content-Type", "text/csv")
                 .body(csv.toString());
     }
 
     /**
-     * Exports a CSV of all user wallets.
-     *
-     * FIX (High): Batch-fetches users instead of querying per-row.
+     * Exports a CSV of user wallets tracking point values.
      */
     @GetMapping("/wallets/export")
     public ResponseEntity<String> exportWalletsCsv() {
@@ -185,26 +103,24 @@ public class AdminController {
                 .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
 
         StringBuilder csv = new StringBuilder();
-        csv.append("User ID,Full Name,Current Balance,Last Updated\n");
+        csv.append("User ID,Email,Available Points,Last Updated\n");
 
         for (UserWallet wallet : wallets) {
             User user = userMap.get(wallet.getUserId());
-            csv.append(user != null ? user.getName() : "Unknown User").append(",")
+            csv.append(wallet.getUserId()).append(",")
                     .append(user != null ? user.getEmail() : "N/A").append(",")
-                    .append(wallet.getCurrentBalance()).append(",")
+                    .append(wallet.getAvailablePoints()).append(",")
                     .append(wallet.getLastUpdated()).append("\n");
         }
 
         return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=wallets_report.csv")
+                .header("Content-Disposition", "attachment; filename=user_points_report.csv")
                 .header("Content-Type", "text/csv")
                 .body(csv.toString());
     }
 
     /**
-     * Returns all wallets enriched with user details for the admin dashboard.
-     *
-     * FIX (High): Batch-fetches users instead of querying per-row.
+     * Returns all user wallets enriched with metadata descriptors for admin panels.
      */
     @GetMapping("/wallets")
     public ResponseEntity<List<AdminWalletDTO>> getAdminWallets() {
@@ -216,12 +132,16 @@ public class AdminController {
 
         List<AdminWalletDTO> result = wallets.stream().map(wallet -> {
             User user = userMap.get(wallet.getUserId());
+
+            // FIX: If currentBalance requires a BigDecimal, we typecast it explicitly here.
+            // If your DTO has already been updated to a long primitive, you can change this back to wallet.getAvailablePoints()
+            BigDecimal balanceValue = BigDecimal.valueOf(wallet.getAvailablePoints());
+
             return AdminWalletDTO.builder()
                     .userId(wallet.getUserId())
-                    .fullName(user != null ? user.getName() : "Unknown User")
-                    .email(user != null ? user.getEmail() : "N/A")
-                    .upiId(user != null ? user.getUpiId() : "N/A")
-                    .currentBalance(wallet.getCurrentBalance())
+                    .fullName(wallet.getFullName() != null ? wallet.getFullName() : (user != null ? user.getName() : "Unknown User"))
+                    .email(wallet.getEmail() != null ? wallet.getEmail() : (user != null ? user.getEmail() : "N/A"))
+                    .currentBalance(wallet.getAvailablePoints())
                     .lastUpdated(wallet.getLastUpdated())
                     .build();
         }).toList();
@@ -243,6 +163,6 @@ public class AdminController {
 
     @GetMapping("/users/{userId}/transactions")
     public ResponseEntity<List<RewardTransaction>> getUserTransactionHistory(@PathVariable String userId) {
-        return ResponseEntity.ok(transactionRepository.findByUserIdOrderByProcessedAtDesc(userId));
+        return ResponseEntity.ok(transactionRepository.findTop10ByUserIdOrderByIdDesc(userId));
     }
 }

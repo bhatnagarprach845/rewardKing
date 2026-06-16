@@ -8,22 +8,26 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepo;
-    private final WalletRepository walletRepo; // Added this
+    private final WalletRepository walletRepo;
 
     @Transactional
     public User syncUser(Jwt jwt) {
         String sub = jwt.getClaimAsString("sub");
         String email = jwt.getClaimAsString("email");
         String name = jwt.getClaimAsString("name");
+
         // Safety check for the 'null name' error we saw earlier
-        if (name == null) name = email.split("@")[0];
+        if (name == null && email != null) {
+            name = email.split("@")[0];
+        } else if (name == null) {
+            name = "Valued Member";
+        }
 
         String finalName = name;
         return userRepo.findById(sub)
@@ -33,7 +37,7 @@ public class UserService {
                     return userRepo.save(existingUser);
                 })
                 .orElseGet(() -> {
-                    // 1. Create User
+                    // 1. Create and persist User record
                     User newUser = User.builder()
                             .cognitoId(sub)
                             .email(email)
@@ -41,10 +45,12 @@ public class UserService {
                             .build();
                     User savedUser = userRepo.saveAndFlush(newUser);
 
-                    // 2. Create Wallet (This prevents the FK error)
+                    // 2. Initialize corresponding points wallet to clear foreign key constraints
                     UserWallet wallet = UserWallet.builder()
                             .userId(sub)
-                            .currentBalance(BigDecimal.ZERO)
+                            .fullName(finalName) // Maps descriptive fields for dashboard summaries
+                            .email(email)
+                            .availablePoints(0L) // FIX: Switched to primitive long point assignment
                             .build();
                     walletRepo.save(wallet);
 

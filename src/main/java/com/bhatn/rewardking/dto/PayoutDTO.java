@@ -2,8 +2,6 @@ package com.bhatn.rewardking.dto;
 
 import lombok.Builder;
 import lombok.Data;
-
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -11,8 +9,11 @@ import java.time.LocalDateTime;
 public class PayoutDTO {
     private String userId;
     private Long id;
-    private String userName; // This is what we're adding
-    private BigDecimal amountAwarded;
+    private String userName;
+
+    // FIX: Switched from BigDecimal to long to process whole points
+    private long amountAwarded;
+
     private LocalDateTime processedAt;
     private String status;
 }

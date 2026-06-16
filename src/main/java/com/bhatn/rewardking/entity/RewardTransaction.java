@@ -1,9 +1,7 @@
 package com.bhatn.rewardking.entity;
 
-
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -13,52 +11,47 @@ import java.time.LocalDateTime;
 @Builder
 public class RewardTransaction {
 
-    @Column(unique = true)
-    private String payoutId; // Store the "pout_..." ID from Razorpay
-    @Override
-    public String toString() {
-        return "RewardTransaction{" +
-                "id=" + id +
-                ", receiptId=" + receiptId +
-                ", userId='" + userId + '\'' +
-                ", amountAwarded=" + amountAwarded +
-                ", processedAt=" + processedAt +
-                ", status=" + status +
-                ", remarks='" + remarks + '\'' +
-                '}';
-    }
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id; // Auto-incrementing primary key
 
     @Column(name = "receipt_id", nullable = true)
-    private Long receiptId; // Links back to the specific receipt that earned this
+    private Long receiptId;
 
     @Column(nullable = false)
-    private String userId; // The user who earned the reward
+    private String userId;
 
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal amountAwarded; // The specific amount (e.g., ₹2.00)
+    // FIX 1: Switched from BigDecimal to long to store clean loyalty points
+    @Column(name = "points_amount", nullable = false)
+    private long pointsAmount;
+
+    // FIX 2: Added missing type field ("EARNED" or "REDEEMED")
+    @Column(nullable = false, length = 20)
+    private String type;
 
     @Column(nullable = false)
-    private LocalDateTime processedAt; // When the Reward was credited
+    private LocalDateTime processedAt;
 
     @Enumerated(EnumType.STRING)
-    private TransactionStatus status; // COMPLETED, REVERSED (for fraud), PAID_OUT
+    private TransactionStatus status;
+
+    // FIX 3: Added notes field to record item catalog identifiers
+    @Column(length = 500)
+    private String notes;
+
+    @Column(unique = true)
+    private String payoutId;
 
     @Column(length = 500)
-    private String remarks; // e.g., "Bonus for first upload" or "Standard 1% Reward"
-    @Column(length = 500)
-    private String razorpayPayoutId; // e.g., "Bonus for first upload" or "Standard 1% Reward"
+    private String razorpayPayoutId;
 
     public enum TransactionStatus {
-        PENDING, // User requested, Admin hasn't seen it yet
-        COMPLETED,  // Bill uploaded successfully
-        REDEEMED,   // User requested payout (Pending)
-        SETTLED,    // // Webhook confirmed success - Money hit user's bank account (Success)
-        FAILED,      // // Webhook confirmed failure - Bank transfer failed (Money refunded to wallet)   // This amount was part of a ₹30+ payout
+        PENDING,
+        COMPLETED,
+        REDEEMED,
+        SETTLED,
+        FAILED,
         REVERSED,
-        APPROVED // Admin clicked 'Approve', sent to Razorpay
+        APPROVED
     }
 }

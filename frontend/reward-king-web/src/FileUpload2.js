@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
@@ -6,6 +6,13 @@ const FileUpload2 = (props) => {
     const [file, setFile] = useState(null);
     const [preview, setPreview] = useState(null);
     const [status, setStatus] = useState("Idle");
+    const pollingIntervalRef = useRef(null);
+
+    useEffect(() => {
+        return () => {
+            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+        };
+    }, []);
 
     const onFileChange = (event) => {
         const selectedFile = event.target.files[0];
@@ -17,9 +24,41 @@ const FileUpload2 = (props) => {
         }
     };
 
+    const pollReceiptStatus = async (receiptId) => {
+        const session = await fetchAuthSession();
+        const token = session.tokens?.idToken?.toString();
+        const apiUrl = process.env.REACT_APP_API_URL;
+
+        pollingIntervalRef.current = setInterval(async () => {
+            try {
+                const res = await axios.get(`${apiUrl}/api/v1/receipts/${receiptId}/status`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const currentStatus = res.data.status;
+
+                if (currentStatus === "PROCESSED") {
+                    setStatus("Success! Reward added to your wallet.");
+                    if (props.onUploadSuccess) props.onUploadSuccess();
+                    clearInterval(pollingIntervalRef.current);
+                } else if (currentStatus === "REJECTED") {
+                    setStatus("Duplicate Detected! This bill has already been rewarded.");
+                    clearInterval(pollingIntervalRef.current);
+                } else if (currentStatus === "FLAGGED_FOR_REVIEW") {
+                    setStatus("Receipt captured! Processing pending verification review.");
+                    clearInterval(pollingIntervalRef.current);
+                }
+            } catch (err) {
+                console.error("Error polling background status:", err);
+                setStatus("Loss of sync with server. Please check history.");
+                clearInterval(pollingIntervalRef.current);
+            }
+        }, 2000);
+    };
+
     const onUpload = async () => {
         if (!file) return alert("Please snap a photo of your receipt first!");
-        if (status === "Uploading...") return;
+        if (status === "Uploading..." || status.startsWith("Analyzing")) return;
 
         const formData = new FormData();
         formData.append("file", file);
@@ -29,8 +68,8 @@ const FileUpload2 = (props) => {
         try {
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
-
             const apiUrl = process.env.REACT_APP_API_URL;
+
             const response = await axios.post(`${apiUrl}/api/v1/upload`, formData, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -39,15 +78,18 @@ const FileUpload2 = (props) => {
             });
 
             const receiptStatus = response.data.status;
-            if (receiptStatus === "REJECTED") {
-                setStatus("Duplicate Detected! This bill has already been rewarded.");
-            } else if (receiptStatus === "PROCESSED") {
+            const receiptId = response.data.id;
+
+            if (receiptStatus === "PROCESSED") {
                 setStatus("Success! Reward added to your wallet.");
-                if (props.onUploadSuccess) {
-                    props.onUploadSuccess();
-                }
+                if (props.onUploadSuccess) props.onUploadSuccess();
+            } else if (receiptStatus === "REJECTED") {
+                setStatus("Duplicate Detected! This bill has already been rewarded.");
             } else if (receiptStatus === "FLAGGED_FOR_REVIEW") {
                 setStatus("Receipt captured! Processing pending verification review.");
+            } else if (["SAVED", "PENDING", "PROCESSING"].includes(receiptStatus)) {
+                setStatus("Analyzing photo data... matching line items.");
+                pollReceiptStatus(receiptId);
             } else {
                 setStatus("Bill processed with issues. Check history.");
             }
@@ -62,7 +104,6 @@ const FileUpload2 = (props) => {
             <h2>Reward King</h2>
             <p>Snap a live photo of your bill to earn rewards</p>
 
-            {/* Production camera restrictions locked into place */}
             <input
                 type="file"
                 accept="image/png, image/jpeg"
@@ -79,14 +120,14 @@ const FileUpload2 = (props) => {
 
             <button
                 onClick={onUpload}
-                disabled={!file || status === "Uploading..."}
+                disabled={!file || status === "Uploading..." || status.startsWith("Analyzing")}
                 style={{
                     ...styles.button,
-                    backgroundColor: (status === "Uploading...") ? "#6c757d" : "#007bff",
-                    cursor: (status === "Uploading...") ? "not-allowed" : "pointer"
+                    backgroundColor: (status === "Uploading..." || status.startsWith("Analyzing")) ? "#6c757d" : "#007bff",
+                    cursor: (status === "Uploading..." || status.startsWith("Analyzing")) ? "not-allowed" : "pointer"
                 }}
             >
-                {status === "Uploading..." ? "Analyzing Photo..." : "Submit Photo"}
+                {status === "Uploading..." ? "Sending File..." : status.startsWith("Analyzing") ? "Running OCR..." : "Submit Photo"}
             </button>
 
             <p style={styles.statusText}>{status}</p>

@@ -2,7 +2,6 @@ package com.bhatn.rewardking.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -17,15 +16,23 @@ public class UserWallet {
     @Column(name = "user_id", nullable = false)
     private String userId; // AWS Cognito Sub/Username
 
+    // FIX 1: Migrated from BigDecimal to long to support points natively
     @Builder.Default
-    @Column(name = "current_balance", precision = 10, scale = 2, nullable = false)
-    private BigDecimal currentBalance = BigDecimal.ZERO;
+    @Column(name = "available_points", nullable = false)
+    private long availablePoints = 0L;
+
+    // Added fields used by your RewardService dashboard response mapping
+    @Column(name = "full_name")
+    private String fullName;
+
+    @Column(name = "email")
+    private String email;
 
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
     @Version
-    private Long version; // Optimistic locking to prevent race conditions during concurrent updates
+    private Long version; // Optimistic locking guard rails for parallel execution threads
 
     @PrePersist
     @PreUpdate
@@ -34,19 +41,22 @@ public class UserWallet {
     }
 
     /**
-     * Logic for the ₹30 threshold.
-     * Useful for the Payout Service to trigger notifications.
+     * Helper method to safely credit newly earned points from scanned bills.
      */
-    public boolean isEligibleForPayout() {
-        return currentBalance != null && currentBalance.compareTo(new BigDecimal("30.00")) >= 0;
+    public void addPoints(long points) {
+        if (points > 0) {
+            this.availablePoints += points;
+        }
     }
 
     /**
-     * Helper method to safely add Reward.
+     * Helper method to safely deduct points during shop checkouts.
      */
-    public void addBalance(BigDecimal amount) {
-        if (amount != null) {
-            this.currentBalance = this.currentBalance.add(amount);
+    public void deductPoints(long points) {
+        if (points > 0 && this.availablePoints >= points) {
+            this.availablePoints -= points;
+        } else if (this.availablePoints < points) {
+            throw new IllegalArgumentException("Insufficient points allocation available.");
         }
     }
 }

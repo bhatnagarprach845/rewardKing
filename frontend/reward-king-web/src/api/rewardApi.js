@@ -7,6 +7,9 @@ const getAuthHeader = async () => {
     const session = await fetchAuthSession();
     const idToken = session.tokens?.idToken?.toString();
     const accessToken = session.tokens?.accessToken?.toString();
+    // 🔑 Extract the email directly from the ID Token payload on the frontend side
+    const email = session.tokens?.idToken?.payload?.email;
+    const name = session.tokens?.idToken?.payload?.name || email?.split('@')[0] || "User";
 
     console.log("Prachi :: ID Token:", idToken ? "present" : "MISSING");
     console.log("Prachi :: Access Token:", accessToken ? "present" : "MISSING");
@@ -25,6 +28,9 @@ export const syncUserWithBackend = async () => {  // this is for users profile
         const response = await fetch(`${BASE_URL}/api/v1/users/sync`, {
             method: 'POST',
             headers
+            },
+            // 🚀 Send the email down safely inside the request body
+            body: JSON.stringify({ email, name })
         });
 
         if (!response.ok) {

@@ -1,5 +1,6 @@
 package com.bhatn.rewardking.service;
 
+import com.bhatn.rewardking.controller.UserController.UserSyncRequest; // Added import
 import com.bhatn.rewardking.entity.User;
 import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.repository.UserRepository;
@@ -17,12 +18,15 @@ public class UserService {
     private final WalletRepository walletRepo;
 
     @Transactional
-    public User syncUser(Jwt jwt) {
+    public User syncUser(Jwt jwt, UserSyncRequest request) { // 🚀 FIX: Accepting DTO reference
+        // 1. Authenticate identity from secure token claim
         String sub = jwt.getClaimAsString("sub");
-        String email = jwt.getClaimAsString("email");
-        String name = jwt.getClaimAsString("name");
 
-        // Safety check for the 'null name' error we saw earlier
+        // 2. Extract profile fields from request body payload
+        String email = request.email();
+        String name = request.name();
+
+        // 3. Keep your robust safety fallbacks fully active
         if (name == null && email != null) {
             name = email.split("@")[0];
         } else if (name == null) {
@@ -37,7 +41,7 @@ public class UserService {
                     return userRepo.save(existingUser);
                 })
                 .orElseGet(() -> {
-                    // 1. Create and persist User record
+                    // Create and persist User record safely with non-null fields
                     User newUser = User.builder()
                             .cognitoId(sub)
                             .email(email)
@@ -45,12 +49,12 @@ public class UserService {
                             .build();
                     User savedUser = userRepo.saveAndFlush(newUser);
 
-                    // 2. Initialize corresponding points wallet to clear foreign key constraints
+                    // Initialize point tracking wallet matching the record ID
                     UserWallet wallet = UserWallet.builder()
                             .userId(sub)
-                            .fullName(finalName) // Maps descriptive fields for dashboard summaries
+                            .fullName(finalName)
                             .email(email)
-                            .availablePoints(0L) // FIX: Switched to primitive long point assignment
+                            .availablePoints(0L)
                             .build();
                     walletRepo.save(wallet);
 

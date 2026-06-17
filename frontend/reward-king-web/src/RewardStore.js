@@ -39,7 +39,7 @@ const RewardStore = () => {
 
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
+            const token = session.tokens?.accessToken?.toString();
 
             // Sending the purchase debit operation back to your Spring Boot microservice
             const response = await axios.post(`${BASE_URL}/redeem-points`,

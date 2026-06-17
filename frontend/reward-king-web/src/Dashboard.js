@@ -11,7 +11,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
     const fetchStatus = async () => {
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
+            const token = session.tokens?.accessToken?.toString();
             if (!token) return;
 
             const res = await axios.get(`${BASE_URL}/payout-status`, {

@@ -26,7 +26,7 @@ const FileUpload2 = (props) => {
 
     const pollReceiptStatus = async (receiptId) => {
         const session = await fetchAuthSession();
-        const token = session.tokens?.idToken?.toString();
+        const token = session.tokens?.accessToken?.toString();
         const apiUrl = process.env.REACT_APP_API_URL;
 
         pollingIntervalRef.current = setInterval(async () => {
@@ -67,7 +67,7 @@ const FileUpload2 = (props) => {
 
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
+            const token = session.tokens?.accessToken?.toString();
             const apiUrl = process.env.REACT_APP_API_URL;
 
             const response = await axios.post(`${apiUrl}/api/v1/upload`, formData, {

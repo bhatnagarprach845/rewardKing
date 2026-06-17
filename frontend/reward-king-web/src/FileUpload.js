@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'react';
+import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 const FileUpload = (props) => {
@@ -72,8 +72,8 @@ const FileUpload = (props) => {
 
             const response = await axios.post(`${apiUrl}/api/v1/upload`, formData, {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data'
+                    'Authorization': `Bearer ${token}`
+
                 }
             });
 

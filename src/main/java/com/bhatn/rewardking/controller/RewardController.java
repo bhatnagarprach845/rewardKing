@@ -6,6 +6,7 @@ import com.bhatn.rewardking.service.RewardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -22,9 +23,9 @@ public class RewardController {
      * Fetch user's current points balance and historical points ledger.
      */
     @GetMapping("/payout-status")
-    public ResponseEntity<PayoutStatusResponse> getPayoutStatus(@AuthenticationPrincipal Principal principal) {
-        String username = principal.getName(); // Extracted securely from AWS Cognito JWT Token
-        PayoutStatusResponse response = rewardService.getUserPointsDashboard(username);
+    public ResponseEntity<PayoutStatusResponse> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {
+        String userId = jwt.getClaimAsString("sub");
+        PayoutStatusResponse response = rewardService.getUserPointsDashboard(userId);
         return ResponseEntity.ok(response);
     }
 

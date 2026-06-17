@@ -86,12 +86,21 @@ public class SecurityConfig {
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        // 1. Configure how roles/groups are extracted
         JwtGrantedAuthoritiesConverter listConverter = new JwtGrantedAuthoritiesConverter();
         listConverter.setAuthorityPrefix("ROLE_");
-        listConverter.setAuthoritiesClaimName("cognito:groups");
 
+        // Access tokens use the 'scope' claim or 'cognito:groups' if assigned to a group.
+        // Setting it to 'scope' ensures standard OAuth2 scopes map cleanly if groups are blank.
+        listConverter.setAuthoritiesClaimName("scope");
+
+        // 2. Fix the Principal Null Mismatch
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(listConverter);
+
+        // 🚀 CRITICAL FIX: Explicitly tell Spring to map the user identity string from the Access Token's "sub" or "username" claim
+        converter.setPrincipalClaimName("sub"); // Change to "username" if you prefer "anilk" over the UUID string
+
         return converter;
     }
 }

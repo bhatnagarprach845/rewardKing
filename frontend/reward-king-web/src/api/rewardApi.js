@@ -2,12 +2,13 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
-// Centralized auth header — always fetches fresh token
-const getAuthHeader = async () => {
+// Centralized auth utility — returns headers along with extracted metadata
+const getAuthDetails = async () => {
     const session = await fetchAuthSession();
     const idToken = session.tokens?.idToken?.toString();
     const accessToken = session.tokens?.accessToken?.toString();
-    // 🔑 Extract the email directly from the ID Token payload on the frontend side
+
+    // Extract profile values directly from the ID Token payload right here
     const email = session.tokens?.idToken?.payload?.email;
     const name = session.tokens?.idToken?.payload?.name || email?.split('@')[0] || "User";
 
@@ -15,22 +16,31 @@ const getAuthHeader = async () => {
     console.log("Prachi :: Access Token:", accessToken ? "present" : "MISSING");
 
     if (!accessToken) throw new Error("No Access token found in session");
+
     return {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+        },
+        email,
+        name
     };
 };
 
-export const syncUserWithBackend = async () => {  // this is for users profile
+export const syncUserWithBackend = async () => {
     try {
-        const headers = await getAuthHeader();
-        console.log ("Reward API.js -- BASE_URL :: ", BASE_URL);
+        // 🚀 Destructure everything out of your fresh session context helper
+        const { headers, email, name } = await getAuthDetails();
+        console.log("Reward API.js -- BASE_URL :: ", BASE_URL);
+
+        // 🔑 FIX: Kept the configuration block correctly enclosed in a single object
         const response = await fetch(`${BASE_URL}/api/v1/users/sync`, {
             method: 'POST',
-            headers
-            },
-            // 🚀 Send the email down safely inside the request body
-            body: JSON.stringify({ email, name })
+            headers: headers,
+            body: JSON.stringify({
+                email: email,
+                name: name
+            }) // Passed perfectly inside the request body framework options now!
         });
 
         if (!response.ok) {
@@ -41,6 +51,6 @@ export const syncUserWithBackend = async () => {  // this is for users profile
         return await response.json();
     } catch (error) {
         console.error("Prachi :: Sync Error:", error);
-        throw error; // Re-throw so App.js can catch it
+        throw error;
     }
 };

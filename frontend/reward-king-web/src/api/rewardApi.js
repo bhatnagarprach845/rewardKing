@@ -19,8 +19,8 @@ const getAuthDetails = async () => {
 
     return {
         headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
+            'authorization': `Bearer ${accessToken}`,
+            'content-type': 'application/json' // Strict lowercase prevents proxy stripping
         },
         email,
         name

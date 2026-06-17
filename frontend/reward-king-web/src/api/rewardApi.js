@@ -11,9 +11,9 @@ const getAuthHeader = async () => {
     console.log("Prachi :: ID Token:", idToken ? "present" : "MISSING");
     console.log("Prachi :: Access Token:", accessToken ? "present" : "MISSING");
 
-    if (!idToken) throw new Error("No ID token found in session");
+    if (!accessToken) throw new Error("No Access token found in session");
     return {
-        'Authorization': `Bearer ${idToken}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
     };
 };

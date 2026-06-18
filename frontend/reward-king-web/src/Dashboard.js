@@ -15,9 +15,17 @@ const Dashboard = ({ refreshTrigger, username }) => {
             if (!token) return;
 
             const res = await axios.get(`${BASE_URL}/payout-status`, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            setData(res.data);
+
+            // 🚀 AWS LAMBDA UNBOXING FIX: Handle proxy event string responses cleanly
+            let responseData = res.data;
+            if (typeof responseData.body === 'string') {
+                responseData = JSON.parse(responseData.body);
+            }
+
+            console.log("Prachi Dashboard :: Loaded user ledger details:", responseData);
+            setData(responseData);
         } catch (err) {
             console.error("Error fetching points status", err);
         }
@@ -27,18 +35,20 @@ const Dashboard = ({ refreshTrigger, username }) => {
         fetchStatus();
     }, [refreshTrigger]);
 
+    // Fallback constants to prevent NaN errors before values load
+    const currentPoints = data?.availablePoints || 0;
+    const milestoneThreshold = data?.threshold || 1000;
+
     const handleGoToShop = () => {
-        // Redirecting directly to your shopping portal catalog
-        // You can pass point metrics via URL search params if your shop template can read them instantly
-        window.location.href = `/shop?availablePoints=${data.currentBalance || 0}`;
+        window.location.href = `/shop?availablePoints=${currentPoints}`;
     };
 
-    // EARLY EXIT BLOCK: Check data availability BEFORE declaring dependent calculation properties
-    if (!data) return <p style={{ color: 'white', textAlign: 'center' }}>Loading your rewards...</p>;
+    // EARLY EXIT BLOCK
+    if (!data) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Loading your rewards...</p>;
 
-    // Calculate progression towards the user's personal milestone goal/threshold
-    const progressPercent = Math.min((data.currentBalance / data.threshold) * 100, 100);
-    const hasPointsToSpend = data.currentBalance > 0;
+    // 🚀 CALCULATIONS FIX: Map to your exact backend entity key configurations
+    const progressPercent = Math.min((currentPoints / milestoneThreshold) * 100, 100);
+    const hasPointsToSpend = currentPoints > 0;
 
     return (
         <>
@@ -48,7 +58,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 </div>
 
                 <h3 style={{ color: '#333', margin: 0 }}>Available Points Balance</h3>
-                <p style={styles.balance}>{(data.currentBalance || 0).toLocaleString()} <span style={{ fontSize: '16px', color: '#666' }}>pts</span></p>
+                <p style={styles.balance}>{currentPoints.toLocaleString()} <span style={{ fontSize: '16px', color: '#666' }}>pts</span></p>
 
                 <div style={styles.progressBase}>
                     <div style={{
@@ -57,7 +67,9 @@ const Dashboard = ({ refreshTrigger, username }) => {
                         backgroundColor: progressPercent >= 100 ? '#28a745' : '#ffc107'
                     }}></div>
                 </div>
-                <p style={styles.message}>{data.statusMessage || `Progressing toward your next milestone target!`}</p>
+                <p style={styles.message}>
+                    {progressPercent >= 100 ? "Milestone target achieved! Visit the shop." : `Progressing toward your next milestone target!`}
+                </p>
 
                 <div style={styles.redeemContainer}>
                     <button
@@ -87,10 +99,11 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {data.recentTransactions.map((tx) => {
-                            const rawAmount = tx.amountAwarded !== undefined ? tx.amountAwarded : tx.amount;
-                            const isCredit = tx.type ? tx.type === 'CREDIT' : parseFloat(rawAmount || 0) >= 0;
+                            // 🚀 MAPPING FIX: Extract properties based on your RewardTransaction entity keys
+                            const rawAmount = tx.pointsAmount !== undefined ? tx.pointsAmount : 0;
+                            const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
                             const displayType = isCredit ? 'EARNED' : 'REDEEMED';
-                            const displayDate = tx.date || (tx.processedAt ? tx.processedAt.split('T')[0] : 'Recent');
+                            const displayDate = tx.processedAt ? tx.processedAt.split('T')[0] : 'Recent';
 
                             return (
                                 <div key={tx.id || Math.random()} style={styles.txRow}>
@@ -111,12 +124,12 @@ const Dashboard = ({ refreshTrigger, username }) => {
                                             fontWeight: 'bold',
                                             color: isCredit ? '#28a745' : '#dc3545'
                                         }}>
-                                            {isCredit ? '+' : '-'} {Math.abs(Math.round(parseFloat(rawAmount || 0))).toLocaleString()} pts
+                                            {isCredit ? '+' : '-'} {Math.round(rawAmount).toLocaleString()} pts
                                         </span>
                                         <div style={{
                                             fontSize: '11px',
                                             fontWeight: '500',
-                                            color: (tx.status === 'COMPLETED' || tx.status === 'APPROVED') ? '#28a745' : '#ffc107',
+                                            color: tx.status === 'COMPLETED' ? '#28a745' : '#ffc107',
                                             marginTop: '4px'
                                         }}>
                                             {tx.status || 'COMPLETED'}
@@ -140,8 +153,6 @@ const styles = {
     message: { fontSize: '12px', color: '#666', marginTop: '5px' },
     redeemContainer: { display: 'flex', marginTop: '20px' },
     shopBtn: { width: '100%', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '15px', transition: 'background-color 0.2s' },
-
-    // Ledger card styles
     historyCard: { padding: '20px', border: '1px solid #ddd', borderRadius: '12px', maxWidth: '400px', margin: '15px auto', backgroundColor: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', color: '#333' },
     txRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' },
     txTypeBadge: { fontSize: '10px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '12px', letterSpacing: '0.5px' }

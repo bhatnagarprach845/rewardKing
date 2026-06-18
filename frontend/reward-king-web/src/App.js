@@ -22,9 +22,11 @@ Amplify.configure({
 });
 
 function App() {
+  // 🚀 THE CONNECTING BRIDGE: Bumping this counter triggers Dashboard's data refetch
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleUploadSuccess = () => {
+    console.log("Prachi Parent :: Intercepted upload success event. Bumping state dependency counter...");
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -32,11 +34,10 @@ function App() {
     useEffect(() => {
       const performSync = async () => {
         try {
-          await syncUserWithBackend(); // Token fetched internally now
-          console.log("Prachi :: User synced with backend successfully");
+          await syncUserWithBackend(); // Dispatches our fixed Access Token + JSON body structure
+          console.log("Prachi :: User profile synchronizations completed with backend ledger.");
         } catch (err) {
-          // Log the FULL error so you can see exactly what AWS rejected
-          console.error("Prachi :: Sync failed. Status:", err.message);
+          console.error("Prachi :: Profile sync pipeline initialization dropped:", err.message);
         }
       };
 
@@ -49,47 +50,58 @@ function App() {
   return (
     <Router>
       <Authenticator signUpAttributes={['email']}>
-        {({ signOut, user }) => (
-          <div className="App" style={styles.appContainer}>
-            <SyncWrapper user={user} />
-            <nav style={styles.nav}>
-              <h2 style={{ color: '#28a745', margin: 0 }}>Reward King</h2>
-              <div style={styles.navLinks}>
-                <Link to="/" style={styles.link}>My Rewards</Link>
-                {user.username === 'prachi' && (
-                  <Link to="/admin" style={styles.adminLink}>Admin Panel</Link>
-                )}
-                <button onClick={signOut} style={styles.logoutBtn}>Sign Out</button>
-              </div>
-            </nav>
+        {({ signOut, user }) => {
+          // Normalize username parsing fallback checks across Cognito login types
+          const currentUsername = user.username || user.signInDetails?.loginId || "User";
 
-            <Routes>
-              <Route path="/" element={
-                <main style={{ padding: '20px' }}>
-                  <Dashboard refreshTrigger={refreshTrigger} username={user.username} />
-                  <div style={{ margin: '30px auto', maxWidth: '400px', borderTop: '1px solid #444' }}></div>
-                  <FileUpload onUploadSuccess={handleUploadSuccess} />
-                </main>
-              } />
-              <Route
-                path="/admin"
-                element={user.username === 'prachi' ? <AdminDashboard /> : <Navigate to="/" replace />}
-              />
-            </Routes>
-          </div>
-        )}
+          // 🔒 STRICT PRIVILEGE GATE: Only 'prachi' is authorized as an administrator
+          const isAdmin = currentUsername === 'prachi';
+
+          return (
+            <div className="App" style={styles.appContainer}>
+              <SyncWrapper user={user} />
+
+              <nav style={styles.nav}>
+                <h2 style={{ color: '#28a745', margin: 0, letterSpacing: '0.5px' }}>👑 Cashback King</h2>
+                <div style={styles.navLinks}>
+                  <Link to="/" style={styles.link}>My Rewards</Link>
+                  {isAdmin && (
+                    <Link to="/admin" style={styles.adminLink}>🔒 Admin Panel</Link>
+                  )}
+                  <button onClick={signOut} style={styles.logoutBtn}>Sign Out</button>
+                </div>
+              </nav>
+
+              <Routes>
+                <Route path="/" element={
+                  <main style={{ padding: '20px' }}>
+                    {/* The refreshTrigger property ensures point counters update in real-time when onUploadSuccess changes it */}
+                    <Dashboard refreshTrigger={refreshTrigger} username={currentUsername} />
+                    <div style={{ margin: '30px auto', maxWidth: '400px', borderTop: '1px solid #333' }}></div>
+                    <FileUpload onUploadSuccess={handleUploadSuccess} />
+                  </main>
+                } />
+
+                <Route
+                  path="/admin"
+                  element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />}
+                />
+              </Routes>
+            </div>
+          );
+        }}
       </Authenticator>
     </Router>
   );
 }
 
 const styles = {
-  appContainer: { backgroundColor: '#1a1a1a', minHeight: '100vh', color: 'white' },
-  nav: { display: 'flex', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid #333', alignItems: 'center' },
-  navLinks: { display: 'flex', gap: '20px', alignItems: 'center' },
-  link: { color: 'white', textDecoration: 'none' },
-  adminLink: { color: '#ffc107', fontWeight: 'bold', textDecoration: 'none' },
-  logoutBtn: { backgroundColor: 'transparent', color: '#888', border: '1px solid #444', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }
+  appContainer: { backgroundColor: '#1a1a1a', minHeight: '100vh', color: 'white', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+  nav: { display: 'flex', justifyContent: 'space-between', padding: '20px 40px', borderBottom: '1px solid #2d2d2d', alignItems: 'center', backgroundColor: '#111' },
+  navLinks: { display: 'flex', gap: '25px', alignItems: 'center' },
+  link: { color: '#bbb', textDecoration: 'none', fontSize: '15px', fontWeight: '500', transition: 'color 0.2s' },
+  adminLink: { color: '#ffc107', fontWeight: 'bold', textDecoration: 'none', fontSize: '15px' },
+  logoutBtn: { backgroundColor: 'transparent', color: '#888', border: '1px solid #333', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s' }
 };
 
 export default App;

@@ -36,7 +36,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
     }, [refreshTrigger]);
 
     // Fallback constants to prevent NaN errors before values load
-    const currentPoints = data?.availablePoints || 0;
+    const currentPoints = data.currentBalance !== undefined ? data.currentBalance : (data.availablePoints || 0);
     const milestoneThreshold = data?.threshold || 1000;
 
     const handleGoToShop = () => {
@@ -100,7 +100,8 @@ const Dashboard = ({ refreshTrigger, username }) => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {data.recentTransactions.map((tx) => {
                             // 🚀 MAPPING FIX: Extract properties based on your RewardTransaction entity keys
-                            const rawAmount = tx.pointsAmount !== undefined ? tx.pointsAmount : 0;
+                            // Change this line inside the map loop:
+                            const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
                             const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
                             const displayType = isCredit ? 'EARNED' : 'REDEEMED';
                             const displayDate = tx.processedAt ? tx.processedAt.split('T')[0] : 'Recent';

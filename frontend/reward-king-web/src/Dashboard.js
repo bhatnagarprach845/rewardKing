@@ -35,18 +35,19 @@ const Dashboard = ({ refreshTrigger, username }) => {
         fetchStatus();
     }, [refreshTrigger]);
 
-    // Fallback constants to prevent NaN errors before values load
+    // 🚀 FIX 1: EARLY EXIT GUARD PLACED FIRST
+    // Prevents reading properties of 'null' during initial mount fetch cycles
+    if (!data) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Loading your rewards...</p>;
+
+    // 🚀 FIX 2: SAFE VARIABLE INTERPOLATION ZONE
+    // Guaranteed non-null. Supports both backend configuration strategy properties.
     const currentPoints = data.currentBalance !== undefined ? data.currentBalance : (data.availablePoints || 0);
-    const milestoneThreshold = data?.threshold || 1000;
+    const milestoneThreshold = data.threshold || 1000;
 
     const handleGoToShop = () => {
         window.location.href = `/shop?availablePoints=${currentPoints}`;
     };
 
-    // EARLY EXIT BLOCK
-    if (!data) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Loading your rewards...</p>;
-
-    // 🚀 CALCULATIONS FIX: Map to your exact backend entity key configurations
     const progressPercent = Math.min((currentPoints / milestoneThreshold) * 100, 100);
     const hasPointsToSpend = currentPoints > 0;
 
@@ -99,12 +100,10 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {data.recentTransactions.map((tx) => {
-                            // 🚀 MAPPING FIX: Extract properties based on your RewardTransaction entity keys
-                            // Change this line inside the map loop:
                             const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
                             const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
                             const displayType = isCredit ? 'EARNED' : 'REDEEMED';
-                            const displayDate = tx.processedAt ? tx.processedAt.split('T')[0] : 'Recent';
+                            const displayDate = tx.processedAt ? tx.processedAt.split('T')[0] : (tx.date || 'Recent');
 
                             return (
                                 <div key={tx.id || Math.random()} style={styles.txRow}>

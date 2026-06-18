@@ -27,29 +27,27 @@ const FileUpload = (props) => {
     const pollReceiptStatus = async (receiptId) => {
         const session = await fetchAuthSession();
         const token = session.tokens?.accessToken?.toString();
-        const apiUrl = process.env.REACT_APP_API_URL;
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
         pollingIntervalRef.current = setInterval(async () => {
             try {
                 const res = await axios.get(`${apiUrl}/api/v1/receipts/${receiptId}/status`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-            // 🚀 PRODUCTION EVENT FIX: Unpack AWS Lambda Proxy payload strings safely
+
+                // 🚀 FIXED: Point explicitly to the scoped HTTP 'res' reference object
                 let data = res.data;
                 if (typeof data.body === 'string') {
-                    data = JSON.parse(data.body); // Parses the nested string into a real object
+                    data = JSON.parse(data.body);
                 }
 
-                // Read the clean properties from your extracted data variable
                 const currentStatus = data.status;
-                const receiptId = data.id;
 
-                console.log("Prachi :: Unpacked Status:", currentStatus, "ID:", receiptId);
-
+                console.log("Prachi Poller :: Async status read result ->", currentStatus);
 
                 if (currentStatus === "PROCESSED") {
                     setStatus("Success! Reward added to your wallet.");
-                    if (props.onUploadSuccess) props.onUploadSuccess();
+                    if (props.onUploadSuccess) props.onUploadSuccess(); // Refreshes Dashboard point balances
                     clearInterval(pollingIntervalRef.current);
                 } else if (currentStatus === "REJECTED") {
                     setStatus("Duplicate Detected! This bill has already been rewarded.");
@@ -78,17 +76,22 @@ const FileUpload = (props) => {
         try {
             const session = await fetchAuthSession();
             const token = session.tokens?.accessToken?.toString();
-            const apiUrl = process.env.REACT_APP_API_URL;
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
             const response = await axios.post(`${apiUrl}/api/v1/upload`, formData, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-
-                }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            const receiptStatus = response.data.status;
-            const receiptId = response.data.id;
+            // 🚀 FIXED: Unbox AWS Lambda proxy payload wrappers here as well
+            let data = response.data;
+            if (typeof data.body === 'string') {
+                data = JSON.parse(data.body);
+            }
+
+            const receiptStatus = data.status;
+            const receiptId = data.id;
+
+            console.log("Prachi Upload :: Direct response read result ->", receiptStatus);
 
             if (receiptStatus === "PROCESSED") {
                 setStatus("Success! Reward added to your wallet.");
@@ -97,14 +100,15 @@ const FileUpload = (props) => {
                 setStatus("Duplicate Detected! This bill has already been rewarded.");
             } else if (receiptStatus === "FLAGGED_FOR_REVIEW") {
                 setStatus("Bill flagged for review due to systemic anomalies.");
-            } else if (["SAVED", "PENDING", "PROCESSING"].includes(receiptStatus)) {
+            } else if (["SAVED", "PENDING", "PROCESSING", "UPLOADED"].includes(receiptStatus)) {
                 setStatus("Processing sandbox file... bypassing native constraints.");
-                pollReceiptStatus(receiptId);
+                pollReceiptStatus(receiptId); // Hands off execution cleanly to your fixed loop helper
             } else {
                 setStatus("Bill processed with issues. Check history.");
             }
 
         } catch (error) {
+            console.error("Prachi Upload :: Network endpoint execution failure:", error);
             setStatus("Failed to upload.");
         }
     };

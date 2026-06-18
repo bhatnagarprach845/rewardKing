@@ -34,8 +34,18 @@ const FileUpload = (props) => {
                 const res = await axios.get(`${apiUrl}/api/v1/receipts/${receiptId}/status`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+            // 🚀 PRODUCTION EVENT FIX: Unpack AWS Lambda Proxy payload strings safely
+                let data = response.data;
+                if (typeof data.body === 'string') {
+                    data = JSON.parse(data.body); // Parses the nested string into a real object
+                }
 
-                const currentStatus = res.data.status;
+                // Read the clean properties from your extracted data variable
+                const currentStatus = data.status;
+                const receiptId = data.id;
+
+                console.log("Prachi :: Unpacked Status:", currentStatus, "ID:", receiptId);
+
 
                 if (currentStatus === "PROCESSED") {
                     setStatus("Success! Reward added to your wallet.");

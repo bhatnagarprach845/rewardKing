@@ -44,8 +44,6 @@ public class ReceiptProcessor {
     @org.springframework.beans.factory.annotation.Autowired
     private ReceiptProcessor self;
 
-    // We can track your points scale multiplier rule from property configurations
-    // e.g., 10 points per 100 currency units spent
     @Value("${Reward.points.multiplier:10}")
     private long pointsMultiplier;
 
@@ -161,23 +159,34 @@ public class ReceiptProcessor {
             return;
         }
 
-        // FIX 1: Convert receipt currency total to a clean points integer count
-        // Example: a ₹150 receipt multiplied by a 10pt rule allocates 15 points
         long pointsAwarded = Math.max(1, receipt.getTotalAmount().longValue() * pointsMultiplier / 100);
 
         log.info("Awarding {} loyalty points for receipt {} from merchant {}",
                 pointsAwarded, receipt.getId(), receipt.getMerchantName());
 
+        // 🚀 PRODUCTION FIX: Secure retrieval with row locking to prevent multi-thread synchronization drops
         UserWallet wallet = walletRepository.findByUserIdForUpdate(receipt.getUserId())
-                .orElseGet(() -> UserWallet.builder().userId(receipt.getUserId()).availablePoints(0L).build());
+                .orElseGet(() -> {
+                    log.info("Wallet absent during processing loop for user {}. Creating row container.", receipt.getUserId());
+                    UserWallet newWallet = UserWallet.builder()
+                            .userId(receipt.getUserId())
+                            .fullName("Valued Member")
+                            .email("user-" + receipt.getUserId() + "@rewardking.com")
+                            .availablePoints(0L) // Crucial initialization to shield against future unboxing exceptions
+                            .build();
+                    return walletRepository.saveAndFlush(newWallet);
+                });
 
-        // FIX 2: Switched to use your new point-store entity setter method
-        wallet.addPoints(pointsAwarded);
-        walletRepository.save(wallet);
+        // 🛡️ CRITICAL BOUNDARY GUARD: Explicit ternary validation to block unboxing NullPointerExceptions
+        Long currentBalanceWrapper = wallet.getAvailablePoints();
+        long verifiedStartingPoints = (currentBalanceWrapper != null) ? currentBalanceWrapper : 0L;
 
-        // FIX 3: Rewritten to support updated points entity constructor parameters
+        // Perform programmatic calculations directly on safe primitive types
+        wallet.setAvailablePoints(verifiedStartingPoints + pointsAwarded);
+        walletRepository.saveAndFlush(wallet);
+
         RewardTransaction tx = RewardTransaction.builder()
-                .id(null) // Handled automatically by database identity auto-increment strategies
+                .id(null)
                 .receiptId(receipt.getId())
                 .userId(receipt.getUserId())
                 .pointsAmount(pointsAwarded)
@@ -189,7 +198,7 @@ public class ReceiptProcessor {
         transactionRepository.save(tx);
 
         receipt.setStatus(ReceiptStatus.PROCESSED);
-        receiptRepository.save(receipt);
+        receiptRepository.saveAndFlush(receipt);
     }
 
     private String calculateFingerprintHash(Receipt receipt) {

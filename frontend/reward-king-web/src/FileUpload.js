@@ -35,7 +35,7 @@ const FileUpload = (props) => {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
             // 🚀 PRODUCTION EVENT FIX: Unpack AWS Lambda Proxy payload strings safely
-                let data = response.data;
+                let data = res.data;
                 if (typeof data.body === 'string') {
                     data = JSON.parse(data.body); // Parses the nested string into a real object
                 }

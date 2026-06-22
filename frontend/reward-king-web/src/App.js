@@ -7,6 +7,7 @@ import '@aws-amplify/ui-react/styles.css';
 import Dashboard from './Dashboard';
 import FileUpload from './FileUpload';
 import AdminDashboard from './AdminDashboard';
+import RewardStore from './RewardStore'; // 🚀 IMPORTED YOUR NEW COMPONENT
 
 Amplify.configure({
   Auth: {
@@ -22,7 +23,6 @@ Amplify.configure({
 });
 
 function App() {
-  // 🚀 THE CONNECTING BRIDGE: Bumping this counter triggers Dashboard's data refetch
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleUploadSuccess = () => {
@@ -34,7 +34,7 @@ function App() {
     useEffect(() => {
       const performSync = async () => {
         try {
-          await syncUserWithBackend(); // Dispatches our fixed Access Token + JSON body structure
+          await syncUserWithBackend();
           console.log("Prachi :: User profile synchronizations completed with backend ledger.");
         } catch (err) {
           console.error("Prachi :: Profile sync pipeline initialization dropped:", err.message);
@@ -51,10 +51,7 @@ function App() {
     <Router>
       <Authenticator signUpAttributes={['email']}>
         {({ signOut, user }) => {
-          // Normalize username parsing fallback checks across Cognito login types
           const currentUsername = user.username || user.signInDetails?.loginId || "User";
-
-          // 🔒 STRICT PRIVILEGE GATE: Only 'prachi' is authorized as an administrator
           const isAdmin = currentUsername === 'prachi';
 
           return (
@@ -65,6 +62,7 @@ function App() {
                 <h2 style={{ color: '#28a745', margin: 0, letterSpacing: '0.5px' }}>👑 Cashback King</h2>
                 <div style={styles.navLinks}>
                   <Link to="/" style={styles.link}>My Rewards</Link>
+                  <Link to="/store" style={styles.link}>Store</Link> {/* Added Quick Store Link */}
                   {isAdmin && (
                     <Link to="/admin" style={styles.adminLink}>🔒 Admin Panel</Link>
                   )}
@@ -73,19 +71,26 @@ function App() {
               </nav>
 
               <Routes>
+                {/* Main Dashboard view path */}
                 <Route path="/" element={
                   <main style={{ padding: '20px' }}>
-                    {/* The refreshTrigger property ensures point counters update in real-time when onUploadSuccess changes it */}
                     <Dashboard refreshTrigger={refreshTrigger} username={currentUsername} />
                     <div style={{ margin: '30px auto', maxWidth: '400px', borderTop: '1px solid #333' }}></div>
                     <FileUpload onUploadSuccess={handleUploadSuccess} />
                   </main>
                 } />
 
+                {/* 🚀 REGISTERED THE REWARD STORE ROUTE */}
+                <Route path="/store" element={<RewardStore />} />
+
+                {/* Admin authorization guard path */}
                 <Route
                   path="/admin"
                   element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />}
                 />
+
+                {/* Catch-all fallback path */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
           );

@@ -45,7 +45,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
     const milestoneThreshold = data.threshold || 1000;
 
     const handleGoToShop = () => {
-        window.location.href = `/shop?availablePoints=${currentPoints}`;
+        window.location.href = `/store?availablePoints=${currentPoints}`;
     };
 
     const progressPercent = Math.min((currentPoints / milestoneThreshold) * 100, 100);

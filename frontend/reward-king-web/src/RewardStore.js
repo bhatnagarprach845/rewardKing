@@ -5,7 +5,6 @@ import axios from 'axios';
 const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 const BASE_URL = `${HOST}/api/v1`;
 
-// Sample Catalog Items
 const MOCK_ITEMS = [
     { id: 'item_01', name: 'Premium Coffee Mug', cost: 10, image: '☕', description: 'Insulated stainless steel mug for your morning brews.' },
     { id: 'item_02', name: 'Wireless Charging Pad', cost: 12, image: '🔋', description: 'Fast 15W sleek desktop wireless charging pad.' },
@@ -15,20 +14,52 @@ const MOCK_ITEMS = [
 
 const RewardStore = () => {
     const [userPoints, setUserPoints] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
     const [isPurchasing, setIsPurchasing] = useState(false);
 
-    // Grab available points from the URL search query parameters when loading page
+    const fetchCurrentWalletBalance = async () => {
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.accessToken?.toString();
+            if (!token) return;
+
+            // 🚀 PRODUCTION FIX: Call your backend directly to get the true balance
+            const res = await axios.get(`${BASE_URL}/payout-status`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            let responseData = res.data;
+            if (typeof responseData.body === 'string') {
+                responseData = JSON.parse(responseData.body);
+            }
+
+            // Fallback strategy to read whatever point field structure your endpoint uses
+            const points = responseData.currentBalance !== undefined ? responseData.currentBalance : (responseData.availablePoints || 0);
+            setUserPoints(points);
+        } catch (err) {
+            console.error("Prachi Store :: Failed to fetch real-time wallet balance:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const pointsParam = params.get('availablePoints');
+
         if (pointsParam) {
+            // If we navigated from the dashboard button, load the parameter immediately for speed
             setUserPoints(parseInt(pointsParam, 10));
+            setIsLoading(false);
+        } else {
+            // 🚀 If clicked from the top navbar Quick Link, hit the backend instantly to load the points
+            fetchCurrentWalletBalance();
         }
     }, []);
 
     const handlePurchase = async (item) => {
         if (userPoints < item.cost) {
-            alert(`Insufficent Points! You need ${item.cost - userPoints} more points to redeem this item.`);
+            alert(`Insufficient Points! You need ${item.cost - userPoints} more points to redeem this item.`);
             return;
         }
 
@@ -41,7 +72,6 @@ const RewardStore = () => {
             const session = await fetchAuthSession();
             const token = session.tokens?.accessToken?.toString();
 
-            // Sending the purchase debit operation back to your Spring Boot microservice
             const response = await axios.post(`${BASE_URL}/redeem-points`,
                 { itemId: item.id, pointsCost: item.cost },
                 { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
@@ -49,17 +79,20 @@ const RewardStore = () => {
 
             if (response.status === 200) {
                 alert(`Order Placed successfully! ${item.name} is on its way.`);
-                setUserPoints(prev => prev - item.cost); // Instantly update local UI point balance
+                setUserPoints(prev => prev - item.cost);
             }
         } catch (err) {
             console.error("Redemption transaction failed:", err);
-            // Fallback for demo sandbox if backend route isn't created yet:
             alert(`[Sandbox Mode Sync Error] Simulated order placed for ${item.name}!`);
             setUserPoints(prev => prev - item.cost);
         } finally {
             setIsPurchasing(false);
         }
     };
+
+    if (isLoading) {
+        return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Syncing store ledger balances...</p>;
+    }
 
     return (
         <div style={styles.container}>
@@ -115,7 +148,7 @@ const styles = {
     title: { textAlign: 'center', fontSize: '26px', margin: '0 0 8px 0', color: '#222' },
     subtitle: { textAlign: 'center', color: '#666', fontSize: '14px', marginBottom: '40px' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' },
-    catalogCard: { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', textAlign: 'left', transition: 'transform 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+    catalogCard: { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', textAlign: 'left', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     itemImage: { fontSize: '48px', textAlign: 'center', margin: '10px 0' },
     itemName: { fontSize: '16px', fontWeight: 'bold', margin: '10px 0 5px 0', color: '#111' },
     itemDesc: { fontSize: '12px', color: '#666', lineHeight: '1.4', flexGrow: 1, marginBottom: '20px' },

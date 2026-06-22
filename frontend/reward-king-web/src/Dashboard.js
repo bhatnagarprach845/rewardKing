@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
+// 🚀 PRODUCTION TRACKING FIX: Import useNavigate for native SPA routing transitions
+import { useNavigate } from 'react-router-dom';
 
 const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 const BASE_URL = `${HOST}/api/v1`;
 
 const Dashboard = ({ refreshTrigger, username }) => {
     const [data, setData] = useState(null);
+    const navigate = useNavigate(); // Initialize your router context navigator hook
 
     const fetchStatus = async () => {
         try {
@@ -18,7 +21,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            // 🚀 AWS LAMBDA UNBOXING FIX: Handle proxy event string responses cleanly
+            // AWS LAMBDA UNBOXING FIX: Handle proxy event string responses cleanly
             let responseData = res.data;
             if (typeof responseData.body === 'string') {
                 responseData = JSON.parse(responseData.body);
@@ -35,17 +38,18 @@ const Dashboard = ({ refreshTrigger, username }) => {
         fetchStatus();
     }, [refreshTrigger]);
 
-    // 🚀 FIX 1: EARLY EXIT GUARD PLACED FIRST
+    // 🚀 EARLY EXIT GUARD PLACED FIRST
     // Prevents reading properties of 'null' during initial mount fetch cycles
     if (!data) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Loading your rewards...</p>;
 
-    // 🚀 FIX 2: SAFE VARIABLE INTERPOLATION ZONE
+    // 🚀 SAFE VARIABLE INTERPOLATION ZONE
     // Guaranteed non-null. Supports both backend configuration strategy properties.
     const currentPoints = data.currentBalance !== undefined ? data.currentBalance : (data.availablePoints || 0);
     const milestoneThreshold = data.threshold || 1000;
 
     const handleGoToShop = () => {
-        window.location.href = `/store?availablePoints=${currentPoints}`;
+        // 🚀 ROUTING FIX: Use dynamic router navigation state to protect your query string params
+        navigate(`/store?availablePoints=${currentPoints}`);
     };
 
     const progressPercent = Math.min((currentPoints / milestoneThreshold) * 100, 100);

@@ -7,10 +7,10 @@ const BASE_URL = `${HOST}/api/v1`;
 
 // Sample Catalog Items
 const MOCK_ITEMS = [
-    { id: 'item_01', name: 'Premium Coffee Mug', cost: 150, image: '☕', description: 'Insulated stainless steel mug for your morning brews.' },
-    { id: 'item_02', name: 'Wireless Charging Pad', cost: 400, image: '🔋', description: 'Fast 15W sleek desktop wireless charging pad.' },
-    { id: 'item_03', name: 'Premium Tech Backpack', cost: 1200, image: '🎒', description: 'Water-resistant laptop bag with integrated USB passthrough.' },
-    { id: 'item_04', name: 'Noise Cancelling Earbuds', cost: 2500, image: '🎧', description: 'True wireless audio with ambient isolation filters.' }
+    { id: 'item_01', name: 'Premium Coffee Mug', cost: 10, image: '☕', description: 'Insulated stainless steel mug for your morning brews.' },
+    { id: 'item_02', name: 'Wireless Charging Pad', cost: 12, image: '🔋', description: 'Fast 15W sleek desktop wireless charging pad.' },
+    { id: 'item_03', name: 'Premium Tech Backpack', cost: 10, image: '🎒', description: 'Water-resistant laptop bag with integrated USB passthrough.' },
+    { id: 'item_04', name: 'Noise Cancelling Earbuds', cost: 10, image: '🎧', description: 'True wireless audio with ambient isolation filters.' }
 ];
 
 const RewardStore = () => {

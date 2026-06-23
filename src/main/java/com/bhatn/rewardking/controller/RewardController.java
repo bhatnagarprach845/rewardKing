@@ -27,19 +27,18 @@ public class RewardController {
      */
     @GetMapping("/payout-status")
     public ResponseEntity<?> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {
-        // 🛡️ Guard Block against invalid signatures
         if (jwt == null) {
             log.error("Prachi Security :: Request dropped due to unauthenticated JWT context.");
             return ResponseEntity.status(401).body(createMapBody("error", "Unauthorized token payload."));
         }
 
-        // 🚀 Cascade claim parsing to safely extract user identity strings
-        String username = extractUsername(jwt);
-        log.info("Prachi Controller :: Fetching dashboard ledger details for verified user: '{}'", username);
+        // 🚀 Call the fixed utility method to extract the 'sub' UUID
+        String userId = extractUserId(jwt);
+        log.info("Prachi Controller :: Fetching dashboard ledger details for database user_id: '{}'", userId);
 
         try {
-            // Linked directly to your exact Service method name: getUserPointsDashboard
-            PayoutStatusResponse dashboardData = rewardService.getUserPointsDashboard(username);
+            // Passes the UUID string (e.g. "41fbb590-...") which matches your DB row perfectly!
+            PayoutStatusResponse dashboardData = rewardService.getUserPointsDashboard(userId);
             return ResponseEntity.ok().body(dashboardData);
         } catch (IllegalArgumentException e) {
             log.warn("Prachi Controller :: Dashboard state error: {}", e.getMessage());
@@ -47,6 +46,30 @@ public class RewardController {
         }
     }
 
+    @PostMapping("/redeem-points")
+    public ResponseEntity<?> redeemPoints(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody RedeemPointsRequest request) {
+
+        if (jwt == null) {
+            return ResponseEntity.status(401).body(createMapBody("error", "Unauthorized token payload."));
+        }
+
+        // 🚀 Call the fixed utility method here as well
+        String userId = extractUserId(jwt);
+        log.info("Prachi Controller :: Processing point checkout for database user_id: '{}'", userId);
+
+        try {
+            rewardService.processPointsRedemption(userId, request.getItemId(), request.getPointsCost());
+
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("message", "Order processed successfully.");
+            responseBody.put("status", "SUCCESS");
+            return ResponseEntity.ok().body(responseBody);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(createMapBody("error", e.getMessage()));
+        }
+    }
     /**
      * Utility parser to securely read identity strings from Cognito tokens.
      */
@@ -56,6 +79,20 @@ public class RewardController {
             username = jwt.getClaimAsString("sub"); // Fallback to user UUID string string mapping
         }
         return username;
+    }
+
+    /**
+     * Utility parser to securely extract the Cognito UUID string (sub)
+     * to align with database primary keys.
+     */
+    private String extractUserId(Jwt jwt) {
+        // 🚀 CRITICAL FIX: Prioritize 'sub' because your tables use the Cognito UUID as user_id/cognito_id
+        String userId = jwt.getClaimAsString("sub");
+
+        if (userId == null) {
+            userId = jwt.getClaimAsString("username"); // Backup fallback
+        }
+        return userId;
     }
 
     /**
@@ -76,49 +113,5 @@ public class RewardController {
         private long pointsCost;
     }
 
-    /**
-     * Process shop order, validate points availability, and deduct points balance.
-     */
-    @PostMapping("/redeem-points")
-    public ResponseEntity<?> redeemPoints(
-            @AuthenticationPrincipal Jwt jwt, // 🚀 1. Bind directly to the verified JWT container
-            @RequestBody RedeemPointsRequest request) {
 
-        // 🚀 2. STRICT SECURITY GUARD: If the token didn't validate, exit cleanly with a 401 Unauthorized
-        if (jwt == null) {
-            log.error("Prachi Security Alert :: Incoming JWT token could not be resolved or validated by Spring Security context!");
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Unauthorized: Invalid or missing security token context.");
-            return ResponseEntity.status(401).body(errorResponse);
-        }
-
-        // 🚀 3. ROBUST CLAIM RESOLUTION: Fallback cascade strategy to safely read the user identity string
-        String username = jwt.getClaimAsString("username"); // Try reading standard Cognito Access Token layout ("anilk")
-        if (username == null) {
-            username = jwt.getClaimAsString("sub"); // Fallback to the unique UUID string if username is blank
-        }
-        if (username == null) {
-            username = jwt.getClaimAsString("client_id"); // Third backup fallback option
-        }
-
-        log.info("Prachi Controller :: Verified user identity: '{}'. Initiating points redemption request.", username);
-
-        try {
-            // Execute the balance modifications inside your service layer
-            rewardService.processPointsRedemption(username, request.getItemId(), request.getPointsCost());
-
-            // 🚀 4. AWS PROXY FIX: Return an object Map so Jackson maps headers cleanly to API Gateway, preventing 502s
-            Map<String, Object> responseBody = new HashMap<>();
-            responseBody.put("message", "Order processed successfully.");
-            responseBody.put("status", "SUCCESS");
-
-            return ResponseEntity.ok().body(responseBody);
-
-        } catch (IllegalArgumentException e) {
-            log.warn("Prachi Controller :: Points processing business validation failure: {}", e.getMessage());
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
-        }
-    }
 }

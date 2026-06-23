@@ -99,7 +99,7 @@ public class SecurityConfig {
         converter.setJwtGrantedAuthoritiesConverter(listConverter);
 
         // 🚀 CRITICAL FIX: Explicitly tell Spring to map the user identity string from the Access Token's "sub" or "username" claim
-        converter.setPrincipalClaimName("sub"); // Change to "username" if you prefer "anilk" over the UUID string
+        converter.setPrincipalClaimName("username"); // Change to "username" if you prefer "anilk" over the UUID string
 
         return converter;
     }

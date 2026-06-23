@@ -21,9 +21,12 @@ const RewardStore = () => {
         try {
             const session = await fetchAuthSession();
             const token = session.tokens?.accessToken?.toString();
-            if (!token) return;
+            if (!token) {
+                setIsLoading(false);
+                return;
+            }
 
-            // 🚀 PRODUCTION FIX: Call your backend directly to get the true balance
+            console.log("Prachi Store :: Navbar link clicked. Fetching fresh wallet row from DB...");
             const res = await axios.get(`${BASE_URL}/payout-status`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -33,13 +36,13 @@ const RewardStore = () => {
                 responseData = JSON.parse(responseData.body);
             }
 
-            // Fallback strategy to read whatever point field structure your endpoint uses
             const points = responseData.currentBalance !== undefined ? responseData.currentBalance : (responseData.availablePoints || 0);
+            console.log("Prachi Store :: Database points loaded successfully:", points);
             setUserPoints(points);
         } catch (err) {
             console.error("Prachi Store :: Failed to fetch real-time wallet balance:", err);
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // 🚀 Crucial: Only turn off loading AFTER the data has arrived!
         }
     };
 
@@ -47,12 +50,13 @@ const RewardStore = () => {
         const params = new URLSearchParams(window.location.search);
         const pointsParam = params.get('availablePoints');
 
-        if (pointsParam) {
-            // If we navigated from the dashboard button, load the parameter immediately for speed
+        if (pointsParam && pointsParam !== "undefined") {
+            // If coming from the dashboard button, use the passed parameters instantly
+            console.log("Prachi Store :: Dashboard button clicked. Loading points from URL params:", pointsParam);
             setUserPoints(parseInt(pointsParam, 10));
             setIsLoading(false);
         } else {
-            // 🚀 If clicked from the top navbar Quick Link, hit the backend instantly to load the points
+            // If coming from the quick navbar link, hit the database manually
             fetchCurrentWalletBalance();
         }
     }, []);
@@ -78,18 +82,30 @@ const RewardStore = () => {
             );
 
             if (response.status === 200) {
+                // 🚀 AWS LAMBDA SAFETY UNBOXING
+                let responseData = response.data;
+                if (responseData && typeof responseData.body === 'string') {
+                    responseData = JSON.parse(responseData.body);
+                }
+
                 alert(`Order Placed successfully! ${item.name} is on its way.`);
-                setUserPoints(prev => prev - item.cost);
+
+                // 💡 OPTION 1: Use backend balance update if provided
+                if (responseData && responseData.updatedBalance !== undefined) {
+                    setUserPoints(responseData.updatedBalance);
+                } else {
+                    // 💡 OPTION 2: Local state subtraction fallback
+                    setUserPoints(prev => prev - item.cost);
+                }
             }
         } catch (err) {
             console.error("Redemption transaction failed:", err);
             alert(`[Sandbox Mode Sync Error] Simulated order placed for ${item.name}!`);
             setUserPoints(prev => prev - item.cost);
-        } finally {
+        } final {
             setIsPurchasing(false);
         }
     };
-
     if (isLoading) {
         return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Syncing store ledger balances...</p>;
     }

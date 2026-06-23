@@ -29,18 +29,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints — order: most specific first
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/debug/**").permitAll()
-                        .requestMatchers("/api/v1/version").permitAll()
-                        .requestMatchers("/api/v1/webhooks/**").permitAll()
 
-                        // FIX: Admin rule MUST come before the wildcard /api/v1/** rule.
-                        // Previously the wildcard matched first, so any authenticated user
-                        // could reach admin endpoints regardless of their role.
-                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-
-                        // All other API endpoints require authentication
-                        .requestMatchers("/api/v1/**").authenticated()
-
+                        // 🚀 FIX: Use uppercase "ADMIN" inside hasRole()
+                        .requestMatchers("/api/v1/wallets/**", "/api/v1/payouts/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/payout-status", "/api/v1/redeem-points").authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth -> oauth
@@ -86,21 +78,21 @@ public class SecurityConfig {
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        // 1. Configure how roles/groups are extracted
         JwtGrantedAuthoritiesConverter listConverter = new JwtGrantedAuthoritiesConverter();
         listConverter.setAuthorityPrefix("ROLE_");
+        listConverter.setAuthoritiesClaimName("cognito:groups");
 
-        // Access tokens use the 'scope' claim or 'cognito:groups' if assigned to a group.
-        // Setting it to 'scope' ensures standard OAuth2 scopes map cleanly if groups are blank.
-        listConverter.setAuthoritiesClaimName("scope");
-
-        // 2. Fix the Principal Null Mismatch
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(listConverter);
 
-        // 🚀 CRITICAL FIX: Explicitly tell Spring to map the user identity string from the Access Token's "sub" or "username" claim
-        converter.setPrincipalClaimName("username"); // Change to "username" if you prefer "anilk" over the UUID string
+        // 🚀 BULLETPROOF NON-ADMIN FIX:
+        // This custom lambda ensures that if a user has no cognito:groups claim,
+        // it gracefully returns an empty collection instead of null, keeping standard users working.
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            var authorities = listConverter.convert(jwt);
+            return authorities != null ? authorities : java.util.Collections.emptyList();
+        });
 
+        converter.setPrincipalClaimName("sub");
         return converter;
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -46,6 +47,9 @@ public class RewardController {
         }
     }
 
+    /**
+     * Bulk points redemption checkout processor for shopping cart line items.
+     */
     @PostMapping("/redeem-points")
     public ResponseEntity<?> redeemPoints(
             @AuthenticationPrincipal Jwt jwt,
@@ -55,30 +59,33 @@ public class RewardController {
             return ResponseEntity.status(401).body(createMapBody("error", "Unauthorized token payload."));
         }
 
-        // 🚀 Call the fixed utility method here as well
         String userId = extractUserId(jwt);
-        log.info("Prachi Controller :: Processing point checkout for database user_id: '{}'", userId);
+        log.info("Prachi Controller :: Processing bulk cart checkout for database user_id: '{}'", userId);
+
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            return ResponseEntity.badRequest().body(createMapBody("error", "Cannot process an empty checkout cart basket."));
+        }
 
         try {
-            rewardService.processPointsRedemption(userId, request.getItemId(), request.getPointsCost());
+            // 🚀 Iterate through the incoming cart array list line items sequentially
+            for (RedeemPointsRequest.CartItemDTO item : request.getItems()) {
+                long totalItemCost = item.getPointsCost() * item.getQuantity();
+                log.info("Prachi Controller :: Processing Item ID: {}, Quantity: {}, Aggregated Cost: {}",
+                        item.getItemId(), item.getQuantity(), totalItemCost);
+
+                // Routes execution to your secure transactional database lock routine
+                rewardService.processPointsRedemption(userId, item.getItemId(), totalItemCost);
+            }
 
             Map<String, Object> responseBody = new HashMap<>();
-            responseBody.put("message", "Order processed successfully.");
+            responseBody.put("message", "Cart checked out and processed successfully.");
             responseBody.put("status", "SUCCESS");
             return ResponseEntity.ok().body(responseBody);
+
         } catch (IllegalArgumentException e) {
+            log.warn("Prachi Controller :: Points processing business validation failure: {}", e.getMessage());
             return ResponseEntity.badRequest().body(createMapBody("error", e.getMessage()));
         }
-    }
-    /**
-     * Utility parser to securely read identity strings from Cognito tokens.
-     */
-    private String extractUsername(Jwt jwt) {
-        String username = jwt.getClaimAsString("username"); // Matches Access Token payload
-        if (username == null) {
-            username = jwt.getClaimAsString("sub"); // Fallback to user UUID string string mapping
-        }
-        return username;
     }
 
     /**
@@ -109,9 +116,13 @@ public class RewardController {
      */
     @Data
     public static class RedeemPointsRequest {
-        private String itemId;
-        private long pointsCost;
+        private List<CartItemDTO> items;
+
+        @Data
+        public static class CartItemDTO {
+            private String itemId;
+            private int quantity;
+            private long pointsCost;
+        }
     }
-
-
 }

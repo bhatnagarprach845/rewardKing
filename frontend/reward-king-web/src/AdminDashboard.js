@@ -167,16 +167,40 @@ const AdminDashboard = () => {
 
             const response = await axios.get(`${BASE_URL}/admin${endpoint}`, {
                 headers: { Authorization: `Bearer ${token}` },
-                responseType: 'blob',
+                responseType: 'text',
             });
 
-            const url = window.URL.createObjectURL(new Blob([response.data]));
+            let finalCsvContent = response.data;
+
+            // 🚀 STEP 2: AWS PROXY UNBOXING
+            // If the response is wrapped inside an API Gateway proxy string layout...
+            if (typeof finalCsvContent === 'string' && finalCsvContent.trim().startsWith('{')) {
+                try {
+                    const parsedJson = JSON.parse(finalCsvContent);
+                    // Extract the clean CSV text hidden inside the proxy body payload
+                    if (parsedJson && parsedJson.body !== undefined) {
+                        finalCsvContent = parsedJson.body;
+                    }
+                } catch (jsonErr) {
+                    // Not actual JSON, fallback to treating the string data as standard CSV rows
+                    console.log("Admin Download :: File content parsed directly as raw text data stream.");
+                }
+            } else if (finalCsvContent && finalCsvContent.body !== undefined) {
+                // Handle cases where Axios converts the wrapper object automatically
+                finalCsvContent = finalCsvContent.body;
+            }
+
+            // 🚀 STEP 3: Create the file stream link using the cleaned CSV text data
+            const blob = new Blob([finalCsvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
             link.setAttribute('download', fileName);
             document.body.appendChild(link);
+
             link.click();
 
+            // Clean up memory anchors
             link.parentNode.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (err) {

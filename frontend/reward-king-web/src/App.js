@@ -59,7 +59,7 @@ function App() {
               <SyncWrapper user={user} />
 
               <nav style={styles.nav}>
-                <h2 style={{ color: '#28a745', margin: 0, letterSpacing: '0.5px' }}>👑 Cashback King</h2>
+                <h2 style={{ color: '#28a745', margin: 0, letterSpacing: '0.5px' }}>👑 Reward King</h2>
                 <div style={styles.navLinks}>
                   <Link to="/" style={styles.link}>My Rewards</Link>
                   <Link to="/store" style={styles.link}>Store</Link> {/* Added Quick Store Link */}

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
+// 🚀 PATH RECONCILIATION: AdminDashboard prefix aligns base calls to standard routing context configurations
 const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-const BASE_URL = `${HOST}/api/v1/admin`;
-console.log("Prachi :: Connecting to backend at:", BASE_URL);
+const BASE_URL = `${HOST}/api/v1`;
+console.log("Prachi Admin Dashboard :: System connected base route target:", BASE_URL);
 
 const AdminDashboard = () => {
     // --- State Management ---
@@ -29,7 +30,9 @@ const AdminDashboard = () => {
     const getStatusStyle = (status) => {
         const styles = {
             'REDEEMED': { backgroundColor: '#f39c12', color: '#fff' },
+            'PENDING':  { backgroundColor: '#f39c12', color: '#fff' },
             'APPROVED': { backgroundColor: '#3498db', color: '#fff' },
+            'COMPLETED':{ backgroundColor: '#27ae60', color: '#fff' },
             'SETTLED':  { backgroundColor: '#27ae60', color: '#fff' },
             'FAILED':   { backgroundColor: '#e74c3c', color: '#fff' },
         };
@@ -41,18 +44,16 @@ const AdminDashboard = () => {
         try {
             const headers = await getAuthHeader();
             const [walletRes, payoutRes] = await Promise.all([
-                axios.get(`${BASE_URL}/wallets`, { headers }),
-                axios.get(`${BASE_URL}/payouts`, { headers })
+                axios.get(`${BASE_URL}/admin/wallets`, { headers }), // Kept /admin explicitly if your Admin controllers have a secondary prefix filter
+                axios.get(`${BASE_URL}/admin/payouts`, { headers })
             ]);
 
-            // 🚀 AWS PROXY UNBOXING FIX FOR WALLETS
             let walletData = walletRes.data;
             if (walletData && typeof walletData.body === 'string') {
                 walletData = JSON.parse(walletData.body);
             }
             const verifiedWallets = Array.isArray(walletData) ? walletData : (walletData.wallets || []);
 
-            // 🚀 AWS PROXY UNBOXING FIX FOR PAYOUTS
             let payoutData = payoutRes.data;
             if (payoutData && typeof payoutData.body === 'string') {
                 payoutData = JSON.parse(payoutData.body);
@@ -75,17 +76,17 @@ const AdminDashboard = () => {
         try {
             const headers = await getAuthHeader();
             if (viewMode === 'activity') {
-                const res = await axios.get(`${BASE_URL}/users/${id}/transactions`, { headers });
+                const res = await axios.get(`${BASE_URL}/admin/users/${id}/transactions`, { headers });
                 let txData = res.data;
                 if (txData && typeof txData.body === 'string') txData = JSON.parse(txData.body);
                 setUserHistory(Array.isArray(txData) ? txData : []);
             } else if (viewMode === 'profile') {
-                const res = await axios.get(`${BASE_URL}/users/${id}/profile`, { headers });
+                const res = await axios.get(`${BASE_URL}/admin/users/${id}/profile`, { headers });
                 let profileData = res.data;
                 if (profileData && typeof profileData.body === 'string') profileData = JSON.parse(profileData.body);
                 setUserDetails(profileData);
             } else if (viewMode === 'receipts') {
-                const res = await axios.get(`${BASE_URL}/users/${id}/receipts`, { headers });
+                const res = await axios.get(`${BASE_URL}/admin/users/${id}/receipts`, { headers });
                 let receiptData = res.data;
                 if (receiptData && typeof receiptData.body === 'string') receiptData = JSON.parse(receiptData.body);
                 setUserReceipts(Array.isArray(receiptData) ? receiptData : []);
@@ -120,10 +121,11 @@ const AdminDashboard = () => {
 
     const handleApprovePayout = async (transactionId, amount) => {
         const absAmount = Math.abs(amount);
-        if (!window.confirm(`Approve payment of ₹${absAmount}?`)) return;
+        if (!window.confirm(`Approve shipment & fulfill order value of ${absAmount} pts?`)) return;
 
         try {
             const headers = await getAuthHeader();
+            // 🚀 FIXED PATH: Corrected URL path mapping dynamically to remove broken admin folders
             const res = await axios.post(`${BASE_URL}/payouts/approve/${transactionId}`, {}, { headers });
             setIsSyncing(true);
             animateValue(absAmount, 0, 1000, setAnimatingBalance);
@@ -135,12 +137,12 @@ const AdminDashboard = () => {
                 ]);
                 setIsSyncing(false);
                 setAnimatingBalance(null);
-                alert(`Success! Payout ID: ${res.data.id || res.data}`);
+                alert(`Order Approved Successfully! Transaction Hook Ref: ${res.data.id || transactionId}`);
             }, 1200);
         } catch (err) {
             setIsSyncing(false);
             setAnimatingBalance(null);
-            alert("Error: " + (err.response?.data || "Server unreachable"));
+            alert("Error: " + (err.response?.data?.error || "Server processing validation failed. Check mappings."));
         }
     };
 
@@ -163,7 +165,7 @@ const AdminDashboard = () => {
             const session = await fetchAuthSession();
             const token = session.tokens?.accessToken?.toString();
 
-            const response = await axios.get(`${BASE_URL}${endpoint}`, {
+            const response = await axios.get(`${BASE_URL}/admin${endpoint}`, {
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob',
             });
@@ -188,36 +190,34 @@ const AdminDashboard = () => {
         if (!userDetails) return null;
         const userWallet = (wallets || []).find(w => String(w.userId) === String(selectedUser.id));
 
-        // 🚀 BACKEND KEY UNIFICATION FIX: Map to availablePoints to match database schema wrapper configuration
         const balance = userWallet?.availablePoints || userWallet?.currentBalance || 0;
         const pendingReq = (payouts || []).find(p => p.userId === selectedUser.id && (p.status === 'REDEEMED' || p.status === 'PENDING'));
-        const absoluteAmount = pendingReq ? Math.abs(pendingReq.amountAwarded) : 0;
+        const absoluteAmount = pendingReq ? Math.abs(pendingReq.amountAwarded || pendingReq.pointsAmount || pendingReq.amount || 0) : 0;
 
         return (
             <div style={styles.contentBox}>
                 <p><strong>Email:</strong> {userDetails.email}</p>
-                <p><strong>UPI ID:</strong> {userDetails.upiId}</p>
+                <p><strong>UPI ID:</strong> {userDetails.upiId || 'N/A'}</p>
                 <p><strong>Wallet Balance:</strong>
                     <span style={{ color: animatingBalance !== null ? '#dc3545' : '#28a745', fontWeight: 'bold', marginLeft: '10px' }}>
-                        {animatingBalance !== null ? `₹${animatingBalance}` : `${balance.toLocaleString()} pts`}
+                        {animatingBalance !== null ? `${animatingBalance} pts` : `${balance.toLocaleString()} pts`}
                     </span>
                 </p>
-                <p><strong>Razorpay ID:</strong> {isSyncing ? "Syncing..." : (userDetails.razorpayFundAccountId || 'Not Created')}</p>
 
                 {pendingReq ? (
-                    <div style={{ border: '1px dashed #f39c12', padding: '12px', marginTop: '10px', borderRadius: '6px' }}>
-                        <p style={{ color: '#f39c12', margin: '0 0 8px 0' }}>⚠️ <strong>Pending Approval Notification</strong></p>
-                        <p><strong>Item Requested:</strong> {pendingReq.notes || 'Merchandise Package'}</p>
-                        <p><strong>Points Value Hold:</strong> {Math.abs(pendingReq.amountAwarded || pendingReq.amount || 0)} pts</p>
+                    <div style={{ border: '1px dashed #f39c12', padding: '15px', marginTop: '15px', borderRadius: '8px', backgroundColor: '#2c1d0a' }}>
+                        <p style={{ color: '#f39c12', margin: '0 0 8px 0', fontWeight: 'bold' }}>⚠️ Pending Fulfillment Queue Notice</p>
+                        <p><strong>Item Catalog Identifiers:</strong> {pendingReq.notes || 'Redemption Merchandise Package'}</p>
+                        <p><strong>Deduction Cost Hold:</strong> {absoluteAmount} pts</p>
 
                         <button
-                            onClick={() => handleApprovePayout(pendingReq.id, pendingReq.amountAwarded || pendingReq.amount)}
-                            style={{ ...styles.payoutBtn, width: '100%', marginTop: '10px' }}
+                            onClick={() => handleApprovePayout(pendingReq.id, absoluteAmount)}
+                            style={{ ...styles.payoutBtn, width: '100%', marginTop: '12px' }}
                         >
-                            Approve & Dispatch Order
+                            Approve & Release Shipment
                         </button>
                     </div>
-                ) : <p style={{ color: '#888', fontStyle: 'italic' }}>No pending redemptions or order queues found.</p>}
+                ) : <p style={{ color: '#888', fontStyle: 'italic', marginTop: '15px' }}>No items inside processing lines or queues currently.</p>}
             </div>
         );
     };
@@ -229,7 +229,7 @@ const AdminDashboard = () => {
             {viewMode !== 'list' && selectedUser ? (
                 <div style={styles.detailView}>
                     <button onClick={() => { setSelectedUser(null); setViewMode('list'); }} style={styles.backBtn}>← Back</button>
-                    <h3 style={{ color: '#fff' }}>User: {selectedUser.name}</h3>
+                    <h3 style={{ color: '#fff' }}>User Identity: {selectedUser.name}</h3>
 
                     <div style={styles.tabGroup}>
                         {['profile', 'receipts', 'activity'].map(tab => (
@@ -253,20 +253,25 @@ const AdminDashboard = () => {
                                         <th>Date</th>
                                         <th>Type</th>
                                         <th>Amount</th>
+                                        <th>Notes</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(userHistory || []).map(tx => (
-                                        <tr key={tx.id} style={styles.row}>
-                                            <td>{tx.processedAt ? new Date(tx.processedAt).toLocaleDateString() : 'Recent'}</td>
-                                            <td>{tx.amountAwarded < 0 ? "💸 Payout" : "💰 Reward"}</td>
-                                            <td style={{ color: tx.amountAwarded < 0 ? '#e74c3c' : '#27ae60', fontWeight: 'bold' }}>
-                                                {Math.abs(tx.amountAwarded || tx.pointsAmount || 0)} pts
-                                            </td>
-                                            <td><span style={{ ...styles.statusBadge, ...getStatusStyle(tx.status) }}>{tx.status}</span></td>
-                                        </tr>
-                                    ))}
+                                    {(userHistory || []).map(tx => {
+                                        const value = tx.amountAwarded !== undefined ? tx.amountAwarded : (tx.amount || tx.pointsAmount || 0);
+                                        return (
+                                            <tr key={tx.id} style={styles.row}>
+                                                <td>{tx.date || (tx.processedAt ? new Date(tx.processedAt).toLocaleDateString() : 'Recent')}</td>
+                                                <td>{tx.type || 'REDEEMED'}</td>
+                                                <td style={{ color: value < 0 || tx.type === 'REDEEMED' ? '#e74c3c' : '#27ae60', fontWeight: 'bold' }}>
+                                                    {value < 0 ? '' : '-'}{Math.abs(value)} pts
+                                                </td>
+                                                <td style={{ fontSize: '12px', color: '#aaa' }}>{tx.notes || 'N/A'}</td>
+                                                <td><span style={{ ...styles.statusBadge, ...getStatusStyle(tx.status) }}>{tx.status || 'PENDING'}</span></td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -287,7 +292,7 @@ const AdminDashboard = () => {
                                         ))}
                                     </tbody>
                                 </table>
-                            ) : <p>No receipts found.</p>}
+                            ) : <p>No receipt lines indexed for profiling.</p>}
                         </div>
                     )}
                 </div>
@@ -298,9 +303,9 @@ const AdminDashboard = () => {
                         <button onClick={() => handleDownload('/payouts/report', 'payout_report.csv')} style={styles.payoutBtn}>Payout CSV</button>
                     </div>
 
-                    <h3 style={styles.subTitle}>Active Wallets</h3>
+                    <h3 style={styles.subTitle}>Active Ledger Wallets</h3>
                     <table style={styles.table}>
-                        <thead><tr style={styles.headerRow}><th>Name</th><th>User ID Identifier</th><th>Balance</th></tr></thead>
+                        <thead><tr style={styles.headerRow}><th>Name</th><th>User Identity UUID Key</th><th>Balance</th></tr></thead>
                         <tbody>
                             {(wallets && Array.isArray(wallets) ? wallets : []).map(w => {
                                 const hasPending = (payouts || []).some(p => p.userId === w.userId && (p.status === 'REDEEMED' || p.status === 'PENDING'));
@@ -310,7 +315,7 @@ const AdminDashboard = () => {
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <button onClick={() => handleUserClick(w.userId, w.fullName)} style={styles.linkButton}>
-                                                    {w.fullName || 'Anonymous Profile'}
+                                                    {w.fullName || 'Anonymous User'}
                                                 </button>
 
                                                 {hasPending && (
@@ -321,16 +326,14 @@ const AdminDashboard = () => {
                                                         borderRadius: '12px',
                                                         fontSize: '10px',
                                                         fontWeight: 'bold',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                                        textTransform: 'uppercase'
                                                     }}>
                                                         Pending 💸
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td style={{ fontSize: '12px', color: '#888' }}>{w.userId}</td>
+                                        <td style={{ fontSize: '11px', color: '#777' }}>{w.userId}</td>
                                         <td style={{ fontWeight: 'bold', color: '#28a745' }}>{walletBalance.toLocaleString()} pts</td>
                                     </tr>
                                 );

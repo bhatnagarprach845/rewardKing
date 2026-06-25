@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
-// 🚀 PRODUCTION TRACKING FIX: Import useNavigate for native SPA routing transitions
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
@@ -9,7 +8,7 @@ const BASE_URL = `${HOST}/api/v1`;
 
 const Dashboard = ({ refreshTrigger, username }) => {
     const [data, setData] = useState(null);
-    const navigate = useNavigate(); // Initialize your router context navigator hook
+    const navigate = useNavigate();
 
     const fetchStatus = async () => {
         try {
@@ -21,7 +20,6 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            // AWS LAMBDA UNBOXING FIX: Handle proxy event string responses cleanly
             let responseData = res.data;
             if (typeof responseData.body === 'string') {
                 responseData = JSON.parse(responseData.body);
@@ -38,17 +36,12 @@ const Dashboard = ({ refreshTrigger, username }) => {
         fetchStatus();
     }, [refreshTrigger]);
 
-    // 🚀 EARLY EXIT GUARD PLACED FIRST
-    // Prevents reading properties of 'null' during initial mount fetch cycles
     if (!data) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Loading your rewards...</p>;
 
-    // 🚀 SAFE VARIABLE INTERPOLATION ZONE
-    // Guaranteed non-null. Supports both backend configuration strategy properties.
     const currentPoints = data.currentBalance !== undefined ? data.currentBalance : (data.availablePoints || 0);
     const milestoneThreshold = data.threshold || 1000;
 
     const handleGoToShop = () => {
-        // 🚀 ROUTING FIX: Use dynamic router navigation state to protect your query string params
         navigate(`/store?availablePoints=${currentPoints}`);
     };
 
@@ -107,11 +100,11 @@ const Dashboard = ({ refreshTrigger, username }) => {
                             const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
                             const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
                             const displayType = isCredit ? 'EARNED' : 'REDEEMED';
-                            const displayDate = tx.processedAt ? tx.processedAt.split('T')[0] : (tx.date || 'Recent');
+                            const displayDate = tx.date || (tx.processedAt ? tx.processedAt.split('T')[0] : 'Recent');
 
                             return (
                                 <div key={tx.id || Math.random()} style={styles.txRow}>
-                                    <div style={{ textAlign: 'left' }}>
+                                    <div style={{ textAlign: 'left', maxWidth: '65%' }}>
                                         <span style={{
                                             ...styles.txTypeBadge,
                                             backgroundColor: isCredit ? '#e8f5e9' : '#ffebee',
@@ -119,7 +112,11 @@ const Dashboard = ({ refreshTrigger, username }) => {
                                         }}>
                                             {displayType}
                                         </span>
-                                        <div style={{ fontSize: '11px', color: '#777', marginTop: '6px' }}>{displayDate}</div>
+                                        {/* 🚀 LEDGER VISIBILITY: Render notes below the badge so the user sees what item they bought */}
+                                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginTop: '6px' }}>
+                                            {tx.notes || (isCredit ? 'Receipt Scanning Allocation' : 'Merchandise Reward Checkout')}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: '#777', marginTop: '4px' }}>{displayDate}</div>
                                     </div>
 
                                     <div style={{ textAlign: 'right' }}>
@@ -132,11 +129,11 @@ const Dashboard = ({ refreshTrigger, username }) => {
                                         </span>
                                         <div style={{
                                             fontSize: '11px',
-                                            fontWeight: '500',
-                                            color: tx.status === 'COMPLETED' ? '#28a745' : '#ffc107',
+                                            fontWeight: 'bold',
+                                            color: tx.status === 'COMPLETED' || tx.status === 'APPROVED' ? '#28a745' : '#f39c12',
                                             marginTop: '4px'
                                         }}>
-                                            {tx.status || 'COMPLETED'}
+                                            {tx.status || 'PENDING'}
                                         </div>
                                     </div>
                                 </div>

@@ -27,7 +27,7 @@ public class RewardService {
         UserWallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User wallet not found for: " + userId));
 
-        // Pull history ledger rows
+        // Pull history ledger rows matching the Cognito UUID string
         List<RewardTransaction> transactions = transactionRepository.findTop10ByUserIdOrderByIdDesc(userId);
 
         List<TransactionDTO> dtos = transactions.stream().map(tx ->
@@ -36,9 +36,11 @@ public class RewardService {
                         .amount(tx.getPointsAmount())
                         .type(tx.getType())
                         .date(tx.getProcessedAt() != null ? tx.getProcessedAt().toLocalDate().toString() : "")
-                        // 🚀 USER VISIBILITY: Explicitly share the approval status and item info with the user
+                        // 🚀 REACT SYNC FIX: Explicitly append alternative naming fields to guarantee mapping matches
+                        .processedAt(tx.getProcessedAt() != null ? tx.getProcessedAt().toString() : "")
                         .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
-                        //.notes(tx.getNotes())
+                        // 🚀 RE-ENABLED NOTES: Crucial for displaying merchandise name strings across dashboards
+                        .notes(tx.getNotes())
                         .build()
         ).collect(Collectors.toList());
 
@@ -61,18 +63,18 @@ public class RewardService {
             throw new IllegalArgumentException("Insufficient points balance. Transaction blocked.");
         }
 
-        // Deduct Points upfront (escrow hold until admin approves or denies)
+        // Deduct points from primary wallet row on initial checkout request placement (Escrow)
         wallet.setAvailablePoints(wallet.getAvailablePoints() - pointsCost);
         walletRepository.save(wallet);
 
-        // Record entry inside history ledger
+        // Record entry inside history database ledger table
         RewardTransaction debitTransaction = new RewardTransaction();
         debitTransaction.setId(null);
         debitTransaction.setUserId(userId);
         debitTransaction.setPointsAmount(pointsCost);
         debitTransaction.setType("REDEEMED");
 
-        // 🚀 ADMIN GATEWAY FIX: Set to PENDING so it populates the Admin Review board
+        // 🚀 SET PENDING STATE: Placed into admin review pipeline rather than auto-completing
         debitTransaction.setStatus(TransactionStatus.PENDING);
         debitTransaction.setProcessedAt(LocalDateTime.now());
         debitTransaction.setNotes("Order Placement: " + itemId);

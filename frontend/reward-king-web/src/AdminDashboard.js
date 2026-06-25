@@ -44,10 +44,27 @@ const AdminDashboard = () => {
                 axios.get(`${BASE_URL}/wallets`, { headers }),
                 axios.get(`${BASE_URL}/payouts`, { headers })
             ]);
-            setWallets(walletRes.data);
-            setPayouts(payoutRes.data);
+
+            // 🚀 AWS PROXY UNBOXING FIX FOR WALLETS
+            let walletData = walletRes.data;
+            if (walletData && typeof walletData.body === 'string') {
+                walletData = JSON.parse(walletData.body);
+            }
+            const verifiedWallets = Array.isArray(walletData) ? walletData : (walletData.wallets || []);
+
+            // 🚀 AWS PROXY UNBOXING FIX FOR PAYOUTS
+            let payoutData = payoutRes.data;
+            if (payoutData && typeof payoutData.body === 'string') {
+                payoutData = JSON.parse(payoutData.body);
+            }
+            const verifiedPayouts = Array.isArray(payoutData) ? payoutData : (payoutData.payouts || []);
+
+            setWallets(verifiedWallets);
+            setPayouts(verifiedPayouts);
         } catch (err) {
             console.error("Dashboard load failed", err);
+            setWallets([]);
+            setPayouts([]);
         }
     };
 
@@ -59,13 +76,19 @@ const AdminDashboard = () => {
             const headers = await getAuthHeader();
             if (viewMode === 'activity') {
                 const res = await axios.get(`${BASE_URL}/users/${id}/transactions`, { headers });
-                setUserHistory(res.data);
+                let txData = res.data;
+                if (txData && typeof txData.body === 'string') txData = JSON.parse(txData.body);
+                setUserHistory(Array.isArray(txData) ? txData : []);
             } else if (viewMode === 'profile') {
                 const res = await axios.get(`${BASE_URL}/users/${id}/profile`, { headers });
-                setUserDetails(res.data);
+                let profileData = res.data;
+                if (profileData && typeof profileData.body === 'string') profileData = JSON.parse(profileData.body);
+                setUserDetails(profileData);
             } else if (viewMode === 'receipts') {
                 const res = await axios.get(`${BASE_URL}/users/${id}/receipts`, { headers });
-                setUserReceipts(Array.isArray(res.data) ? res.data : []);
+                let receiptData = res.data;
+                if (receiptData && typeof receiptData.body === 'string') receiptData = JSON.parse(receiptData.body);
+                setUserReceipts(Array.isArray(receiptData) ? receiptData : []);
             }
         } catch (err) {
             console.error(`Failed to fetch ${viewMode} data`, err);
@@ -163,9 +186,11 @@ const AdminDashboard = () => {
     // --- Sub-Components (Render Helpers) ---
     const renderProfileTab = () => {
         if (!userDetails) return null;
-        const userWallet = wallets.find(w => String(w.userId) === String(selectedUser.id));
-        const balance = userWallet?.currentBalance || 0;
-        const pendingReq = payouts.find(p => p.userId === selectedUser.id && (p.status === 'REDEEMED' || p.status === 'PENDING'));
+        const userWallet = (wallets || []).find(w => String(w.userId) === String(selectedUser.id));
+
+        // 🚀 BACKEND KEY UNIFICATION FIX: Map to availablePoints to match database schema wrapper configuration
+        const balance = userWallet?.availablePoints || userWallet?.currentBalance || 0;
+        const pendingReq = (payouts || []).find(p => p.userId === selectedUser.id && (p.status === 'REDEEMED' || p.status === 'PENDING'));
         const absoluteAmount = pendingReq ? Math.abs(pendingReq.amountAwarded) : 0;
 
         return (
@@ -174,7 +199,7 @@ const AdminDashboard = () => {
                 <p><strong>UPI ID:</strong> {userDetails.upiId}</p>
                 <p><strong>Wallet Balance:</strong>
                     <span style={{ color: animatingBalance !== null ? '#dc3545' : '#28a745', fontWeight: 'bold', marginLeft: '10px' }}>
-                        ₹{animatingBalance !== null ? animatingBalance : balance.toFixed(2)}
+                        {animatingBalance !== null ? `₹${animatingBalance}` : `${balance.toLocaleString()} pts`}
                     </span>
                 </p>
                 <p><strong>Razorpay ID:</strong> {isSyncing ? "Syncing..." : (userDetails.razorpayFundAccountId || 'Not Created')}</p>
@@ -185,7 +210,7 @@ const AdminDashboard = () => {
                         style={{ ...styles.payoutBtn, width: '100%', marginTop: '10px', opacity: absoluteAmount < 1 ? 0.5 : 1 }}
                         disabled={absoluteAmount < 1}
                     >
-                        {absoluteAmount < 1 ? `Low Balance (₹${absoluteAmount})` : `Approve & Pay ₹${absoluteAmount}`}
+                        {absoluteAmount < 1 ? `Low Balance (${absoluteAmount} pts)` : `Approve & Pay ${absoluteAmount} pts`}
                     </button>
                 ) : <p style={{ color: '#888', fontStyle: 'italic' }}>No pending redemptions.</p>}
             </div>
@@ -227,12 +252,12 @@ const AdminDashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {userHistory.map(tx => (
+                                    {(userHistory || []).map(tx => (
                                         <tr key={tx.id} style={styles.row}>
-                                            <td>{new Date(tx.processedAt).toLocaleDateString()}</td>
+                                            <td>{tx.processedAt ? new Date(tx.processedAt).toLocaleDateString() : 'Recent'}</td>
                                             <td>{tx.amountAwarded < 0 ? "💸 Payout" : "💰 Reward"}</td>
                                             <td style={{ color: tx.amountAwarded < 0 ? '#e74c3c' : '#27ae60', fontWeight: 'bold' }}>
-                                                ₹{Math.abs(tx.amountAwarded)}
+                                                {Math.abs(tx.amountAwarded || tx.pointsAmount || 0)} pts
                                             </td>
                                             <td><span style={{ ...styles.statusBadge, ...getStatusStyle(tx.status) }}>{tx.status}</span></td>
                                         </tr>
@@ -244,7 +269,7 @@ const AdminDashboard = () => {
 
                     {viewMode === 'receipts' && (
                         <div style={styles.contentBox}>
-                            {userReceipts.length > 0 ? (
+                            {(userReceipts || []).length > 0 ? (
                                 <table style={styles.table}>
                                     <thead><tr style={styles.headerRow}><th>Merchant</th><th>Amount</th><th>Status</th></tr></thead>
                                     <tbody>
@@ -270,20 +295,19 @@ const AdminDashboard = () => {
 
                     <h3 style={styles.subTitle}>Active Wallets</h3>
                     <table style={styles.table}>
-                        <thead><tr style={styles.headerRow}><th>Name</th><th>UPI</th><th>Balance</th></tr></thead>
+                        <thead><tr style={styles.headerRow}><th>Name</th><th>User ID Identifier</th><th>Balance</th></tr></thead>
                         <tbody>
-                            {wallets.map(w => {
-                                // FIXED: Changed to block scope curly brace to allow constant variables
-                                const hasPending = payouts.some(p => p.userId === w.userId && (p.status === 'REDEEMED' || p.status === 'PENDING'));
+                            {(wallets && Array.isArray(wallets) ? wallets : []).map(w => {
+                                const hasPending = (payouts || []).some(p => p.userId === w.userId && (p.status === 'REDEEMED' || p.status === 'PENDING'));
+                                const walletBalance = w.availablePoints !== undefined ? w.availablePoints : (w.currentBalance || 0);
                                 return (
                                     <tr key={w.userId} style={styles.row}>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <button onClick={() => handleUserClick(w.userId, w.fullName)} style={styles.linkButton}>
-                                                    {w.fullName}
+                                                    {w.fullName || 'Anonymous Profile'}
                                                 </button>
 
-                                                {/* Visual Indicator Pill */}
                                                 {hasPending && (
                                                     <span style={{
                                                         backgroundColor: '#dc3545',
@@ -301,8 +325,8 @@ const AdminDashboard = () => {
                                                 )}
                                             </div>
                                         </td>
-                                        <td>{w.upiId || 'N/A'}</td>
-                                        <td>₹{w.currentBalance?.toFixed(2)}</td>
+                                        <td style={{ fontSize: '12px', color: '#888' }}>{w.userId}</td>
+                                        <td style={{ fontWeight: 'bold', color: '#28a745' }}>{walletBalance.toLocaleString()} pts</td>
                                     </tr>
                                 );
                             })}
@@ -321,7 +345,7 @@ const AdminDashboard = () => {
                         </div>
                         <table style={{ width: '100%', marginTop: '15px', color: '#333' }}>
                             <tbody>
-                                {selectedReceipt.items?.map(item => (
+                                {(selectedReceipt.items || []).map(item => (
                                     <tr key={item.id}><td>{item.description}</td><td>x{item.quantity}</td><td>₹{item.totalPrice}</td></tr>
                                 ))}
                             </tbody>

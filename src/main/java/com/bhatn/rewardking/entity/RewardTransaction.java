@@ -52,6 +52,7 @@ public class RewardTransaction {
         SETTLED,
         FAILED,
         REVERSED,
-        APPROVED
+        APPROVED,
+        SHIPPED
     }
 }

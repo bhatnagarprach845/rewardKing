@@ -205,14 +205,19 @@ const AdminDashboard = () => {
                 <p><strong>Razorpay ID:</strong> {isSyncing ? "Syncing..." : (userDetails.razorpayFundAccountId || 'Not Created')}</p>
 
                 {pendingReq ? (
-                    <button
-                        onClick={() => handleApprovePayout(pendingReq.id, absoluteAmount)}
-                        style={{ ...styles.payoutBtn, width: '100%', marginTop: '10px', opacity: absoluteAmount < 1 ? 0.5 : 1 }}
-                        disabled={absoluteAmount < 1}
-                    >
-                        {absoluteAmount < 1 ? `Low Balance (${absoluteAmount} pts)` : `Approve & Pay ${absoluteAmount} pts`}
-                    </button>
-                ) : <p style={{ color: '#888', fontStyle: 'italic' }}>No pending redemptions.</p>}
+                    <div style={{ border: '1px dashed #f39c12', padding: '12px', marginTop: '10px', borderRadius: '6px' }}>
+                        <p style={{ color: '#f39c12', margin: '0 0 8px 0' }}>⚠️ <strong>Pending Approval Notification</strong></p>
+                        <p><strong>Item Requested:</strong> {pendingReq.notes || 'Merchandise Package'}</p>
+                        <p><strong>Points Value Hold:</strong> {Math.abs(pendingReq.amountAwarded || pendingReq.amount || 0)} pts</p>
+
+                        <button
+                            onClick={() => handleApprovePayout(pendingReq.id, pendingReq.amountAwarded || pendingReq.amount)}
+                            style={{ ...styles.payoutBtn, width: '100%', marginTop: '10px' }}
+                        >
+                            Approve & Dispatch Order
+                        </button>
+                    </div>
+                ) : <p style={{ color: '#888', fontStyle: 'italic' }}>No pending redemptions or order queues found.</p>}
             </div>
         );
     };

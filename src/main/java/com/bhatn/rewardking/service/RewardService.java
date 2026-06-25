@@ -22,23 +22,23 @@ public class RewardService {
     private final WalletRepository walletRepository;
     private final RewardTransactionRepository transactionRepository;
 
-    /**
-     * Fetch user's current points balance and historical points ledger.
-     */
     @Transactional(readOnly = true)
     public PayoutStatusResponse getUserPointsDashboard(String userId) {
         UserWallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User wallet not found for: " + userId));
 
+        // Pull history ledger rows
         List<RewardTransaction> transactions = transactionRepository.findTop10ByUserIdOrderByIdDesc(userId);
 
         List<TransactionDTO> dtos = transactions.stream().map(tx ->
                 TransactionDTO.builder()
-                        .id(String.valueOf(tx.getId())) // Converts Long ID securely to String for DTO
+                        .id(String.valueOf(tx.getId()))
                         .amount(tx.getPointsAmount())
                         .type(tx.getType())
                         .date(tx.getProcessedAt() != null ? tx.getProcessedAt().toLocalDate().toString() : "")
-                        .status(tx.getStatus() != null ? tx.getStatus().name() : "COMPLETED")
+                        // 🚀 USER VISIBILITY: Explicitly share the approval status and item info with the user
+                        .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
+                        //.notes(tx.getNotes())
                         .build()
         ).collect(Collectors.toList());
 
@@ -52,32 +52,30 @@ public class RewardService {
                 .build();
     }
 
-    /**
-     * Circuit breaker validation logic to handle points checkouts safely.
-     */
     @Transactional
     public void processPointsRedemption(String userId, String itemId, long pointsCost) {
         UserWallet wallet = walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user profile instance."));
 
-        // Strict Circuit-Breaker: Validate points sufficiency
         if (wallet.getAvailablePoints() < pointsCost) {
             throw new IllegalArgumentException("Insufficient points balance. Transaction blocked.");
         }
 
-        // Atomically Deduct Points from Core Balance Row
+        // Deduct Points upfront (escrow hold until admin approves or denies)
         wallet.setAvailablePoints(wallet.getAvailablePoints() - pointsCost);
         walletRepository.save(wallet);
 
-        // Record a DEBIT entry directly inside your transaction history ledger
+        // Record entry inside history ledger
         RewardTransaction debitTransaction = new RewardTransaction();
-        debitTransaction.setId(null); // Set to null so database handles auto-increment identity strategy
+        debitTransaction.setId(null);
         debitTransaction.setUserId(userId);
         debitTransaction.setPointsAmount(pointsCost);
         debitTransaction.setType("REDEEMED");
-        debitTransaction.setStatus(TransactionStatus.COMPLETED); // Uses type-safe Enum assignment
-        debitTransaction.setProcessedAt(LocalDateTime.now());   // Aligned to entity LocalDateTime definition
-        debitTransaction.setNotes("Redeemed item catalog identifier: " + itemId);
+
+        // 🚀 ADMIN GATEWAY FIX: Set to PENDING so it populates the Admin Review board
+        debitTransaction.setStatus(TransactionStatus.PENDING);
+        debitTransaction.setProcessedAt(LocalDateTime.now());
+        debitTransaction.setNotes("Order Placement: " + itemId);
 
         transactionRepository.save(debitTransaction);
     }

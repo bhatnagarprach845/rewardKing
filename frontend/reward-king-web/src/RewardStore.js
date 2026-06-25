@@ -42,7 +42,7 @@ const RewardStore = () => {
         } catch (err) {
             console.error("Prachi Store :: Failed to fetch real-time wallet balance:", err);
         } finally {
-            setIsLoading(false); // 🚀 Crucial: Only turn off loading AFTER the data has arrived!
+            setIsLoading(false);
         }
     };
 
@@ -51,12 +51,10 @@ const RewardStore = () => {
         const pointsParam = params.get('availablePoints');
 
         if (pointsParam && pointsParam !== "undefined") {
-            // If coming from the dashboard button, use the passed parameters instantly
             console.log("Prachi Store :: Dashboard button clicked. Loading points from URL params:", pointsParam);
             setUserPoints(parseInt(pointsParam, 10));
             setIsLoading(false);
         } else {
-            // If coming from the quick navbar link, hit the database manually
             fetchCurrentWalletBalance();
         }
     }, []);
@@ -82,7 +80,6 @@ const RewardStore = () => {
             );
 
             if (response.status === 200) {
-                // 🚀 AWS LAMBDA SAFETY UNBOXING
                 let responseData = response.data;
                 if (responseData && typeof responseData.body === 'string') {
                     responseData = JSON.parse(responseData.body);
@@ -90,11 +87,9 @@ const RewardStore = () => {
 
                 alert(`Order Placed successfully! ${item.name} is on its way.`);
 
-                // 💡 OPTION 1: Use backend balance update if provided
                 if (responseData && responseData.updatedBalance !== undefined) {
                     setUserPoints(responseData.updatedBalance);
                 } else {
-                    // 💡 OPTION 2: Local state subtraction fallback
                     setUserPoints(prev => prev - item.cost);
                 }
             }
@@ -102,10 +97,11 @@ const RewardStore = () => {
             console.error("Redemption transaction failed:", err);
             alert(`[Sandbox Mode Sync Error] Simulated order placed for ${item.name}!`);
             setUserPoints(prev => prev - item.cost);
-        } final {
+        } finally { // 🚀 FIXED: Swapped 'final' out for syntactically clean 'finally' statement block
             setIsPurchasing(false);
         }
     };
+
     if (isLoading) {
         return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Syncing store ledger balances...</p>;
     }

@@ -3,7 +3,7 @@ name: Trigger CodeBuild Backend1
 on:
   push:
     branches:
-      - feature-RewardFunctionality
+      - feature-Enhancements
 
 jobs:
   trigger-aws-build:

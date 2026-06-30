@@ -44,6 +44,24 @@ const UserProfile = () => {
 
     const handleSave = async (e) => {
         e.preventDefault();
+
+    // 🚀 PHONE NUMBER VALIDATION CHECKS
+    // Strips spaces, dashes, or parentheses to evaluate pure digits
+    const cleanPhone = profile.phoneNumber.replace(/[\s\-()]/g, '');
+
+    // Regex patterns:
+    // Ensures the number is between 10 and 13 digits (accommodating optional country codes)
+    const phoneRegex = /^[0-9]{10,13}$/;
+
+    if (!profile.phoneNumber.trim()) {
+        alert("⚠️ Phone number cannot be left empty. It is required for delivery coordination.");
+        return;
+    }
+
+    if (!phoneRegex.test(cleanPhone)) {
+        alert("⚠️ Please enter a valid phone number (10 to 13 digits). Do not include letters or special characters.");
+        return;
+    }
         setIsSaving(true);
         try {
             const session = await fetchAuthSession();

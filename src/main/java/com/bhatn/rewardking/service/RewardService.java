@@ -1,13 +1,19 @@
 package com.bhatn.rewardking.service;
 
+import com.bhatn.rewardking.controller.RewardController.RedeemPointsRequest;
 import com.bhatn.rewardking.dto.PayoutStatusResponse;
 import com.bhatn.rewardking.dto.PayoutStatusResponse.TransactionDTO;
 import com.bhatn.rewardking.entity.RewardTransaction;
 import com.bhatn.rewardking.entity.RewardTransaction.TransactionStatus;
+import com.bhatn.rewardking.entity.StoreItem;
 import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.repository.RewardTransactionRepository;
+import com.bhatn.rewardking.repository.StoreItemRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,17 +23,23 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RewardService {
 
     private final WalletRepository walletRepository;
     private final RewardTransactionRepository transactionRepository;
+    private final StoreItemRepository storeItemRepository;
+
+    @Transactional(readOnly = true)
+    public List<StoreItem> getAllStoreItems() {
+        return storeItemRepository.findAll();
+    }
 
     @Transactional(readOnly = true)
     public PayoutStatusResponse getUserPointsDashboard(String userId) {
         UserWallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User wallet not found for: " + userId));
 
-        // Pull history ledger rows matching the Cognito UUID string
         List<RewardTransaction> transactions = transactionRepository.findTop10ByUserIdOrderByIdDesc(userId);
 
         List<TransactionDTO> dtos = transactions.stream().map(tx ->
@@ -36,11 +48,10 @@ public class RewardService {
                         .amount(tx.getPointsAmount())
                         .type(tx.getType())
                         .date(tx.getProcessedAt() != null ? tx.getProcessedAt().toLocalDate().toString() : "")
-                        // 🚀 REACT SYNC FIX: Explicitly append alternative naming fields to guarantee mapping matches
                         .processedAt(tx.getProcessedAt() != null ? tx.getProcessedAt().toString() : "")
                         .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
-                        // 🚀 RE-ENABLED NOTES: Crucial for displaying merchandise name strings across dashboards
                         .notes(tx.getNotes())
+                        .trackingnumber(tx.getTrackingNumber()) // Expose tracking number to frontend
                         .build()
         ).collect(Collectors.toList());
 
@@ -48,37 +59,78 @@ public class RewardService {
                 .name(wallet.getFullName())
                 .email(wallet.getEmail())
                 .currentBalance(wallet.getAvailablePoints())
-                .threshold(1000L)
                 .statusMessage("Keep scanning bills to claim bigger items!")
                 .recentTransactions(dtos)
                 .build();
     }
 
+    /**
+     * 🚀 TRANSACTION GUARDEED: Processes the entire cart atomically.
+     * If an item is out of stock or points are insufficient, the entire operation rolls back.
+     */
     @Transactional
-    public void processPointsRedemption(String userId, String itemId, long pointsCost) {
+    public void processBulkCartRedemption(String userId, List<RedeemPointsRequest.CartItemDTO> cartItems) {
         UserWallet wallet = walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user profile instance."));
 
-        if (wallet.getAvailablePoints() < pointsCost) {
-            throw new IllegalArgumentException("Insufficient points balance. Transaction blocked.");
+        long totalCartCost = 0;
+        for (RedeemPointsRequest.CartItemDTO item : cartItems) {
+            StoreItem storeItem = storeItemRepository.findById(item.getItemId())
+                    .orElseThrow(() -> new IllegalArgumentException("Item not found: " + item.getItemId()));
+
+            if (storeItem.getStockLevel() < item.getQuantity()) {
+                throw new IllegalArgumentException("Item out of stock: " + storeItem.getName());
+            }
+            totalCartCost += storeItem.getPointsCost() * item.getQuantity();
         }
 
-        // Deduct points from primary wallet row on initial checkout request placement (Escrow)
-        wallet.setAvailablePoints(wallet.getAvailablePoints() - pointsCost);
+        if (wallet.getAvailablePoints() < totalCartCost) {
+            throw new IllegalArgumentException("Insufficient points balance. Cart checkout blocked.");
+        }
+
+        // Apply deductions atomically
+        wallet.setAvailablePoints(wallet.getAvailablePoints() - totalCartCost);
         walletRepository.save(wallet);
 
-        // Record entry inside history database ledger table
-        RewardTransaction debitTransaction = new RewardTransaction();
-        debitTransaction.setId(null);
-        debitTransaction.setUserId(userId);
-        debitTransaction.setPointsAmount(pointsCost);
-        debitTransaction.setType("REDEEMED");
+        for (RedeemPointsRequest.CartItemDTO item : cartItems) {
+            StoreItem storeItem = storeItemRepository.findById(item.getItemId()).get();
 
-        // 🚀 SET PENDING STATE: Placed into admin review pipeline rather than auto-completing
-        debitTransaction.setStatus(TransactionStatus.PENDING);
-        debitTransaction.setProcessedAt(LocalDateTime.now());
-        debitTransaction.setNotes("Order Placement: " + itemId);
+            // Decrement Stock Level
+            storeItem.setStockLevel(storeItem.getStockLevel() - item.getQuantity());
+            storeItemRepository.save(storeItem);
 
-        transactionRepository.save(debitTransaction);
+            // Record fulfillment request row
+            RewardTransaction debitTransaction = RewardTransaction.builder()
+                    .userId(userId)
+                    .pointsAmount(storeItem.getPointsCost() * item.getQuantity())
+                    .type("REDEEMED")
+                    .status(TransactionStatus.PENDING)
+                    .processedAt(LocalDateTime.now())
+                    .notes("Order Placement: " + item.getItemId())
+                    .build();
+
+            transactionRepository.save(debitTransaction);
+        }
+    }
+
+    /**
+     * 🚀 PAGINATION: Efficient administration querying over large wallet volumes
+     */
+    @Transactional(readOnly = true)
+    public Page<UserWallet> getPaginatedWallets(Pageable pageable) {
+        return walletRepository.findAll(pageable);
+    }
+
+    @Transactional
+    public void updateOrderStatusWithTracking(Long transactionId, String newStatus, String trackingNumber) {
+        RewardTransaction tx = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException("Order record not found."));
+
+        tx.setStatus(RewardTransaction.TransactionStatus.valueOf(newStatus.toUpperCase()));
+        if (trackingNumber != null && !trackingNumber.trim().isEmpty()) {
+            tx.setTrackingNumber(trackingNumber.trim());
+        }
+        tx.setProcessedAt(LocalDateTime.now());
+        transactionRepository.save(tx);
     }
 }

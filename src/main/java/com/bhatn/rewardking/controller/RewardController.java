@@ -1,21 +1,19 @@
 package com.bhatn.rewardking.controller;
 
 import com.bhatn.rewardking.dto.PayoutStatusResponse;
-import com.bhatn.rewardking.entity.RewardTransaction;
-import com.bhatn.rewardking.entity.RewardTransaction.TransactionStatus;
+import com.bhatn.rewardking.entity.StoreItem;
 import com.bhatn.rewardking.entity.UserWallet;
-import com.bhatn.rewardking.repository.RewardTransactionRepository;
-import com.bhatn.rewardking.repository.WalletRepository;
 import com.bhatn.rewardking.service.RewardService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,199 +26,68 @@ import java.util.Map;
 public class RewardController {
 
     private final RewardService rewardService;
-    private final RewardTransactionRepository transactionRepository;
-    private final WalletRepository walletRepository;
 
-    /**
-     * Fetch the authenticated user's profile card information.
-     */
-    @GetMapping("/users/profile")
-    public ResponseEntity<?> getUserProfile(@AuthenticationPrincipal Jwt jwt) {
-        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized."));
-
-        String userId = extractUserId(jwt);
-        // Reuse your wallet repository entry since it already holds name and email fields securely!
-        UserWallet wallet = walletRepository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Profile database line missing."));
-
-        Map<String, Object> profile = new HashMap<>();
-        profile.put("name", wallet.getFullName());
-        profile.put("email", wallet.getEmail());
-        profile.put("address", wallet.getAddress() != null ? wallet.getAddress() : "");
-        profile.put("phoneNumber", wallet.getPhonenumber() != null ? wallet.getPhonenumber() : "");
-        //profile.put("upiId", wallet.getUpiId() != null ? wallet.getUpiId() : "");
-
-        return ResponseEntity.ok().body(profile);
+    @GetMapping("/store/items")
+    public ResponseEntity<?> getStoreCatalog() {
+        return ResponseEntity.ok(rewardService.getAllStoreItems());
     }
 
-    /**
-     * Save/Update the user's phone number and shipping address fields.
-     */
-    @PostMapping("/users/profile/update")
-    public ResponseEntity<?> updateUserProfile(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestBody Map<String, String> payload) {
-
-        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized."));
-
-        String userId = extractUserId(jwt);
-        UserWallet wallet = walletRepository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Profile line missing."));
-
-        // Persist the inputs into your user_wallets columns
-        wallet.setAddress(payload.get("address"));
-        wallet.setPhonenumber(payload.get("phoneNumber"));
-        if(payload.containsKey("upiId")) {
-           // wallet.setUpiId(payload.get("upiId"));
-        }
-
-        walletRepository.save(wallet);
-        return ResponseEntity.ok().body(Map.of("message", "Profile tracking matrix synchronized successfully!"));
-    }
-
-    /**
-     * Fetch user's current points balance and historical points ledger.
-     */
-    @GetMapping("/payout-status")
-    public ResponseEntity<?> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {
-        if (jwt == null) {
-            log.error("Prachi Security :: Request dropped due to unauthenticated JWT context.");
-            return ResponseEntity.status(401).body(createMapBody("error", "Unauthorized token payload."));
-        }
-
-        String userId = extractUserId(jwt);
-        log.info("Prachi Controller :: Fetching dashboard ledger details for database user_id: '{}'", userId);
-
-        try {
-            PayoutStatusResponse dashboardData = rewardService.getUserPointsDashboard(userId);
-            return ResponseEntity.ok().body(dashboardData);
-        } catch (IllegalArgumentException e) {
-            log.warn("Prachi Controller :: Dashboard state error: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(createMapBody("error", e.getMessage()));
-        }
-    }
-
-    /**
-     * Bulk points redemption checkout processor for shopping cart line items.
-     */
     @PostMapping("/redeem-points")
-    public ResponseEntity<?> redeemPoints(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestBody RedeemPointsRequest request) {
-
-        if (jwt == null) {
-            return ResponseEntity.status(401).body(createMapBody("error", "Unauthorized token payload."));
-        }
-
+    public ResponseEntity<?> redeemPoints(@AuthenticationPrincipal Jwt jwt, @RequestBody RedeemPointsRequest request) {
+        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized token."));
         String userId = extractUserId(jwt);
-        log.info("Prachi Controller :: Processing bulk cart checkout for database user_id: '{}'", userId);
 
         if (request.getItems() == null || request.getItems().isEmpty()) {
-            return ResponseEntity.badRequest().body(createMapBody("error", "Cannot process an empty checkout cart basket."));
+            return ResponseEntity.badRequest().body(Map.of("error", "Cannot process an empty cart."));
         }
 
         try {
-            for (RedeemPointsRequest.CartItemDTO item : request.getItems()) {
-                long totalItemCost = item.getPointsCost() * item.getQuantity();
-                log.info("Prachi Controller :: Processing Item ID: {}, Quantity: {}, Aggregated Cost: {}",
-                        item.getItemId(), item.getQuantity(), totalItemCost);
-
-                rewardService.processPointsRedemption(userId, item.getItemId(), totalItemCost);
-            }
-
-            Map<String, Object> responseBody = new HashMap<>();
-            responseBody.put("message", "Cart checked out and processed successfully.");
-            responseBody.put("status", "SUCCESS");
-            return ResponseEntity.ok().body(responseBody);
-
+            rewardService.processBulkCartRedemption(userId, request.getItems());
+            return ResponseEntity.ok(Map.of("message", "Cart checked out atomically.", "status", "SUCCESS"));
         } catch (IllegalArgumentException e) {
-            log.warn("Prachi Controller :: Points processing failure: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(createMapBody("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     /**
-     * Update order tracking statuses dynamically (PENDING -> APPROVED -> SHIPPED -> DELIVERED)
+     * 🚀 PAGINATED WALLETS LOOKUP FOR ADMIN PANEL
      */
+    @GetMapping("/admin/wallets")
+    public ResponseEntity<?> getAdminWallets(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        Page<UserWallet> walletPage = rewardService.getPaginatedWallets(PageRequest.of(page, size));
+        return ResponseEntity.ok(walletPage);
+    }
+
     @PostMapping("/payouts/update-status/{transactionId}")
     public ResponseEntity<?> updateOrderStatus(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long transactionId,
-            @RequestParam String newStatus) {
-
-        if (jwt == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized access token."));
-        }
+            @RequestParam String newStatus,
+            @RequestParam(required = false) String trackingNumber) {
+        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized."));
 
         try {
-            RewardTransaction tx = transactionRepository.findById(transactionId)
-                    .orElseThrow(() -> new IllegalArgumentException("Order record not found."));
-
-            // Dynamically cast incoming string parameter to our internal Enum safely
-            tx.setStatus(RewardTransaction.TransactionStatus.valueOf(newStatus.toUpperCase()));
-            tx.setProcessedAt(LocalDateTime.now());
-            transactionRepository.save(tx);
-
-            log.info("Prachi Admin :: Successfully updated order ID {} status to: {}", transactionId, newStatus);
-            return ResponseEntity.ok().body(Map.of("status", "SUCCESS", "currentStatus", newStatus));
-
+            rewardService.updateOrderStatusWithTracking(transactionId, newStatus, trackingNumber);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid status code sequence requested."));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    /**
-     * 🚀 ROUTE ALIGNMENT FIX: Handle direct order/payout validations securely
-     */
-    @PostMapping("/payouts/approve/{transactionId}")
-    public ResponseEntity<?> approvePayout(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long transactionId) {
-
-        if (jwt == null) {
-            return ResponseEntity.status(401).body(createMapBody("error", "Unauthorized access signature token context."));
-        }
-
-        log.info("Prachi Admin :: Confirming authorization for transaction ID execution state: {}", transactionId);
-
-        try {
-            RewardTransaction tx = transactionRepository.findById(transactionId)
-                    .orElseThrow(() -> new IllegalArgumentException("Transaction record not found inside history database tables."));
-
-            // Convert state to COMPLETED or APPROVED
-            tx.setStatus(TransactionStatus.COMPLETED);
-            tx.setProcessedAt(LocalDateTime.now());
-            transactionRepository.save(tx);
-
-            Map<String, Object> responseBody = new HashMap<>();
-            responseBody.put("id", transactionId);
-            responseBody.put("status", "COMPLETED");
-            responseBody.put("message", "Item checkout authorization processed cleanly.");
-            return ResponseEntity.ok().body(responseBody);
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(createMapBody("error", e.getMessage()));
-        }
+    @GetMapping("/payout-status")
+    public ResponseEntity<?> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        return ResponseEntity.ok(rewardService.getUserPointsDashboard(extractUserId(jwt)));
     }
 
     private String extractUserId(Jwt jwt) {
         String userId = jwt.getClaimAsString("sub");
-        if (userId == null) {
-            userId = jwt.getClaimAsString("username");
-        }
-        return userId;
-    }
-
-    private Map<String, String> createMapBody(String key, String value) {
-        Map<String, String> map = new HashMap<>();
-        map.put(key, value);
-        return map;
+        return userId != null ? userId : jwt.getClaimAsString("username");
     }
 
     @Data
     public static class RedeemPointsRequest {
         private List<CartItemDTO> items;
-
         @Data
         public static class CartItemDTO {
             private String itemId;

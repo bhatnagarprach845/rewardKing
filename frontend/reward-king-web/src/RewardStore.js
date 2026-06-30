@@ -1,227 +1,150 @@
 import React, { useState, useEffect } from 'react';
-import { fetchAuthSession } from 'aws-amplify/auth';
-import axios from 'axios';
-
-const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-const BASE_URL = `${HOST}/api/v1`;
-
-const MOCK_ITEMS = [
-    { id: 'item_01', name: 'Premium Coffee Mug', cost: 10, image: '☕', description: 'Insulated stainless steel mug for your morning brews.' },
-    { id: 'item_02', name: 'Wireless Charging Pad', cost: 12, image: '🔋', description: 'Fast 15W sleek desktop wireless charging pad.' },
-    { id: 'item_03', name: 'Premium Tech Backpack', cost: 10, image: '🎒', description: 'Water-resistant laptop bag with integrated USB passthrough.' },
-    { id: 'item_04', name: 'Noise Cancelling Earbuds', cost: 10, image: '🎧', description: 'True wireless audio with ambient isolation filters.' }
-];
+import apiClient from './apiClient';
 
 const RewardStore = () => {
     const [userPoints, setUserPoints] = useState(0);
+    const [catalog, setCatalog] = useState([]);
     const [cart, setCart] = useState([]);
+    const [profileComplete, setProfileComplete] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [isPurchasing, setIsPurchasing] = useState(false);
 
-    // Fetch account balance fallback
-    const fetchCurrentWalletBalance = async () => {
-        try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
-            if (!token) return;
-
-            const res = await axios.get(`${BASE_URL}/payout-status`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            let responseData = res.data;
-            if (typeof responseData.body === 'string') {
-                responseData = JSON.parse(responseData.body);
-            }
-
-            const points = responseData.currentBalance !== undefined ? responseData.currentBalance : (responseData.availablePoints || 0);
-            setUserPoints(points);
-        } catch (err) {
-            console.error("Prachi Store :: Failed to fetch real-time wallet balance:", err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Load initial context details on mount
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const pointsParam = params.get('availablePoints');
+        const loadInitialStoreContext = async () => {
+            try {
+                const [walletRes, catalogRes, profileRes] = await Promise.all([
+                    apiClient.get('/payout-status'),
+                    apiClient.get('/store/items'),
+                    apiClient.get('/users/profile')
+                ]);
 
-        if (pointsParam && pointsParam !== "undefined") {
-            setUserPoints(parseInt(pointsParam, 10));
-            setIsLoading(false);
-        } else {
-            fetchCurrentWalletBalance();
-        }
+                setUserPoints(walletRes.data.currentBalance || walletRes.data.availablePoints || 0);
+                setCatalog(Array.isArray(catalogRes.data) ? catalogRes.data : []);
 
-        // 🚀 Read persisted local cart data if it exists
-        const savedCart = localStorage.getItem('cashback_king_cart');
-        if (savedCart) {
-            try { setCart(JSON.parse(savedCart)); } catch (e) { setCart([]); }
-        }
+                // 🚀 UX PROMPT COMPLETENESS GUARD CHECK
+                const p = profileRes.data;
+                if (!p.address || !p.phoneNumber) {
+                    setProfileComplete(false);
+                }
+            } catch (err) {
+                console.error("Store init load failed:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadInitialStoreContext();
     }, []);
 
-    // Helper: Persist cart movements locally
-    const saveCartWithStorage = (updatedCart) => {
-        setCart(updatedCart);
-        localStorage.setItem('cashback_king_cart', JSON.stringify(updatedCart));
-    };
-
-    // --- Cart Actions ---
     const addToCart = (item) => {
-        const existingItem = cart.find(i => i.id === item.id);
-        if (existingItem) {
-            const updated = cart.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-            saveCartWithStorage(updated);
-        } else {
-            const updated = [...cart, { ...item, quantity: 1 }];
-            saveCartWithStorage(updated);
-        }
-    };
+        const cartItem = cart.find(i => i.itemId === item.itemId);
+        const currentQty = cartItem ? cartItem.quantity : 0;
 
-    const updateQuantity = (itemId, delta) => {
-        const updated = cart.map(item => {
-            if (item.id === itemId) {
-                const newQty = item.quantity + delta;
-                return newQty > 0 ? { ...item, quantity: newQty } : null;
-            }
-            return item;
-        }).filter(Boolean);
-        saveCartWithStorage(updated);
-    };
-
-    const removeFromCart = (itemId) => {
-        const updated = cart.filter(item => item.id !== itemId);
-        saveCartWithStorage(updated);
-    };
-
-    const getCartTotal = () => cart.reduce((sum, item) => sum + (item.cost * item.quantity), 0);
-
-    // --- Core Checkout Flow ---
-    const handleCheckout = async () => {
-        const totalCost = getCartTotal();
-        if (userPoints < totalCost) {
-            alert(`Insufficient points! Your cart total is ${totalCost} pts, but you only have ${userPoints} pts.`);
+        if (currentQty >= item.stockLevel) {
+            alert(`Sorry! Only ${item.stockLevel} units are available in our warehouse.`);
             return;
         }
 
-        const confirmCheckout = window.confirm(`Confirm redemption checkout for ${totalCost} pts?`);
-        if (!confirmCheckout) return;
+        if (cartItem) {
+            setCart(cart.map(i => i.itemId === item.itemId ? { ...i, quantity: i.quantity + 1 } : i));
+        } else {
+            setCart([...cart, { ...item, quantity: 1 }]);
+        }
+    };
 
+    const getCartTotal = () => cart.reduce((sum, item) => sum + (item.pointsCost * item.quantity), 0);
+
+    const handleCheckout = async () => {
+        // 🚀 PREVENT CHECKOUT IF ADDRESS IS BLANK
+        if (!profileComplete) {
+            alert("⚠️ Missing Shipping Information! Please navigate to your Profile page to save an address and phone number before completing your order.");
+            window.location.href = '/profile';
+            return;
+        }
+
+        const totalCost = getCartTotal();
+        if (userPoints < totalCost) {
+            alert("Insufficient points balance available.");
+            return;
+        }
+
+        if (!window.confirm("Confirm checkout optimization basket redemptions?")) return;
         setIsPurchasing(true);
 
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
+            const itemsPayload = cart.map(i => ({ itemId: i.itemId, quantity: i.quantity, pointsCost: i.pointsCost }));
+            await apiClient.post('/redeem-points', { items: itemsPayload });
 
-            // Transform local cart array to match backend bulk payload contract requirements
-            const itemsPayload = cart.map(i => ({
-                itemId: i.id,
-                quantity: i.quantity,
-                pointsCost: i.cost
-            }));
-
-            const response = await axios.post(`${BASE_URL}/redeem-points`,
-                { items: itemsPayload },
-                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-            );
-
-            if (response.status === 200) {
-                alert("🎉 Order placed successfully! Your rewards are on the way.");
-                setUserPoints(prev => prev - totalCost);
-                saveCartWithStorage([]); // Reset local cart states immediately
-            }
-        } catch (err) {
-            console.error("Redemption checkout failed:", err);
-            alert("[Sandbox Outbox Check] Simulation complete! Order synchronized.");
+            alert("🎉 Basket verified! Your items have shifted to active fulfillment tracking pipelines.");
             setUserPoints(prev => prev - totalCost);
-            saveCartWithStorage([]);
+            setCart([]);
+
+            // Reload catalog to refresh stock allocations
+            const freshCatalog = await apiClient.get('/store/items');
+            setCatalog(freshCatalog.data);
+        } catch (e) {
+            alert("Checkout processing transaction failed.");
         } finally {
             setIsPurchasing(false);
         }
     };
 
-    if (isLoading) {
-        return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Syncing store ledger balances...</p>;
-    }
-
-    const cartTotal = getCartTotal();
+    if (isLoading) return <p style={{ color: 'white', textAlign: 'center' }}>Syncing parameters...</p>;
 
     return (
         <div style={styles.container}>
             <div style={styles.headerRow}>
                 <button onClick={() => window.location.href = '/'} style={styles.backBtn}>🏡 Dashboard</button>
-                <div style={styles.pointsDisplay}>
-                    <span>Your Balance:</span>
-                    <strong>{userPoints.toLocaleString()} pts</strong>
-                </div>
+                <div style={styles.pointsDisplay}>Balance: <strong>{userPoints.toLocaleString()} pts</strong></div>
             </div>
 
-            <div style={styles.mainLayout}>
-                {/* Left Side: Catalog Cards */}
-                <div style={styles.catalogSide}>
-                    <h2 style={styles.title}>Reward Store Catalog</h2>
-                    <p style={styles.subtitle}>Redeem your receipt points for premium merchandise.</p>
+            {!profileComplete && (
+                <div style={styles.alertBanner}>
+                    ⚠️ <strong>Shipping Notice:</strong> Profile incomplete. <a href="/profile" style={{color: '#fff', fontWeight: 'bold'}}>Click here to add shipping fields</a> before checkout.
+                </div>
+            )}
 
+            <div style={styles.mainLayout}>
+                <div style={styles.catalogSide}>
+                    <h2>Reward Catalog</h2>
                     <div style={styles.grid}>
-                        {MOCK_ITEMS.map(item => (
-                            <div key={item.id} style={styles.catalogCard}>
-                                <div style={styles.itemImage}>{item.image}</div>
-                                <h3 style={styles.itemName}>{item.name}</h3>
-                                <p style={styles.itemDesc}>{item.description}</p>
-                                <div style={styles.actionRow}>
-                                    <span style={styles.priceTag}>{item.cost} pts</span>
-                                    <button onClick={() => addToCart(item)} style={styles.addToCartBtn}>
-                                        + Add to Cart
-                                    </button>
+                        {catalog.map(item => {
+                            const isOutOfStock = item.stockLevel <= 0;
+                            return (
+                                <div key={item.itemId} style={styles.catalogCard}>
+                                    <div style={styles.itemImage}>{item.imageEmoji}</div>
+                                    <h3 style={styles.itemName}>{item.name}</h3>
+                                    <p style={styles.itemDesc}>{item.description}</p>
+                                    <p style={{fontSize: '11px', color: isOutOfStock ? '#dc3545' : '#888'}}>Stock: {item.stockLevel} left</p>
+                                    <div style={styles.actionRow}>
+                                        <span style={styles.priceTag}>{item.pointsCost} pts</span>
+                                        {/* 🚀 OUT OF STOCK AUTOMATIC BUTTON DISABLE */}
+                                        <button
+                                            onClick={() => addToCart(item)}
+                                            disabled={isOutOfStock}
+                                            style={{...styles.addToCartBtn, backgroundColor: isOutOfStock ? '#ccc' : '#007bff'}}
+                                        >
+                                            {isOutOfStock ? 'Out of Stock' : '+ Add to Cart'}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
-                {/* Right Side: Interactive Checkout Basket Panel */}
+                {/* Right Side Basket */}
                 <div style={styles.cartSide}>
-                    <h3 style={styles.cartTitle}>🛒 Your Reward Basket</h3>
-                    {cart.length === 0 ? (
-                        <p style={styles.emptyCartText}>Your basket is currently empty. Add rewards from the catalog!</p>
-                    ) : (
-                        <>
-                            <div style={styles.cartList}>
-                                {cart.map(item => (
-                                    <div key={item.id} style={styles.cartRow}>
-                                        <div style={{ flexGrow: 1 }}>
-                                            <div style={styles.cartItemName}>{item.name}</div>
-                                            <div style={styles.cartItemSub}>{item.cost * item.quantity} pts total</div>
-                                        </div>
-                                        <div style={styles.qtyControlGroup}>
-                                            <button onClick={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>-</button>
-                                            <span style={styles.qtyValue}>{item.quantity}</span>
-                                            <button onClick={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>+</button>
-                                            <button onClick={() => removeFromCart(item.id)} style={styles.deleteBtn}>🗑️</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={styles.cartSummary}>
-                                <div style={styles.summaryRow}>
-                                    <span>Basket Total:</span>
-                                    <strong>{cartTotal} pts</strong>
-                                </div>
-                                <button
-                                    onClick={handleCheckout}
-                                    disabled={isPurchasing || userPoints < cartTotal}
-                                    style={{
-                                        ...styles.checkoutBtn,
-                                        backgroundColor: userPoints >= cartTotal ? '#28a745' : '#ccc',
-                                        cursor: userPoints >= cartTotal ? 'pointer' : 'not-allowed'
-                                    }}
-                                >
-                                    {isPurchasing ? 'Processing...' : 'Checkout Basket'}
-                                </button>
-                            </div>
-                        </>
+                    <h3>🛒 Your Basket</h3>
+                    {cart.map(i => (
+                        <div key={i.itemId} style={styles.cartRow}>
+                            <div>{i.name} (x{i.quantity})</div>
+                            <div>{i.pointsCost * i.quantity} pts</div>
+                        </div>
+                    ))}
+                    {cart.length > 0 && (
+                        <button onClick={handleCheckout} disabled={isPurchasing} style={styles.checkoutBtn}>
+                            Checkout Basket ({getCartTotal()} pts)
+                        </button>
                     )}
                 </div>
             </div>
@@ -229,37 +152,26 @@ const RewardStore = () => {
     );
 };
 
+// Styles mapped to extensions dynamically
 const styles = {
-    container: { padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'Arial, sans-serif', color: '#333' },
-    headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', backgroundColor: '#f8f9fa', padding: '15px 20px', borderRadius: '12px', border: '1px solid #eee' },
-    backBtn: { backgroundColor: '#fff', border: '1px solid #ccc', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#555' },
-    pointsDisplay: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' },
-    mainLayout: { display: 'flex', gap: '30px', alignItems: 'flex-start', flexWrap: 'wrap' },
-    catalogSide: { flex: '3 1 600px' },
-    cartSide: { flex: '1 1 320px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '20px', border: '1px solid #e0e0e0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
-    title: { fontSize: '26px', margin: '0 0 8px 0', color: '#fff', textAlign: 'left' },
-    subtitle: { color: '#888', fontSize: '14px', marginBottom: '30px', textAlign: 'left' },
+    container: { padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'Arial, sans-serif' },
+    headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', backgroundColor: '#f8f9fa', padding: '15px 20px', borderRadius: '12px' },
+    backBtn: { padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    pointsDisplay: { fontSize: '16px' },
+    alertBanner: { backgroundColor: '#dc3545', color: 'white', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' },
+    mainLayout: { display: 'flex', gap: '30px', flexWrap: 'wrap' },
+    catalogSide: { flex: '3 1 600px', color: '#fff' },
+    cartSide: { flex: '1 1 320px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '20px' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' },
-    catalogCard: { backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', textAlign: 'left' },
-    itemImage: { fontSize: '40px', textAlign: 'center', margin: '10px 0' },
-    itemName: { fontSize: '15px', fontWeight: 'bold', margin: '5px 0', color: '#111' },
-    itemDesc: { fontSize: '12px', color: '#666', lineHeight: '1.4', flexGrow: 1, marginBottom: '15px' },
-    actionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    priceTag: { fontSize: '15px', fontWeight: 'bold', color: '#28a745' },
-    addToCartBtn: { backgroundColor: '#007bff', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' },
-    cartTitle: { margin: '0 0 15px 0', fontSize: '18px', color: '#111', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px' },
-    emptyCartText: { fontSize: '13px', color: '#777', lineHeight: '1.5', textAlign: 'center', margin: '20px 0' },
-    cartList: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px', maxHeight: '300px', overflowY: 'auto' },
-    cartRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee' },
-    cartItemName: { fontSize: '13px', fontWeight: 'bold', color: '#111' },
-    cartItemSub: { fontSize: '11px', color: '#666', marginTop: '2px' },
-    qtyControlGroup: { display: 'flex', alignItems: 'center', gap: '6px' },
-    qtyBtn: { width: '22px', height: '22px', border: '1px solid #ccc', background: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' },
-    qtyValue: { fontSize: '13px', fontWeight: 'bold', width: '15px', textAlign: 'center' },
-    deleteBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', marginLeft: '4px' },
-    cartSummary: { borderTop: '1px solid #e0e0e0', paddingTop: '15px' },
-    summaryRow: { display: 'flex', justifyContent: 'space-between', fontSize: '15px', marginBottom: '15px', color: '#111' },
-    checkoutBtn: { width: '100%', color: 'white', border: 'none', padding: '10px', borderRadius: '8px', fontWeight: 'bold', fontSize: '14px', transition: 'background-color 0.2s' }
+    catalogCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', color: '#333' },
+    itemImage: { fontSize: '40px', textAlign: 'center' },
+    itemName: { fontSize: '15px', fontWeight: 'bold' },
+    itemDesc: { fontSize: '12px', color: '#666', flexGrow: 1 },
+    actionRow: { display: 'flex', justifyContent: 'space-between', marginTop: '15px' },
+    priceTag: { fontWeight: 'bold', color: '#28a745' },
+    addToCartBtn: { color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' },
+    cartRow: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #ddd', fontSize: '13px' },
+    checkoutBtn: { width: '100%', backgroundColor: '#28a745', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', marginTop: '15px', fontWeight: 'bold', cursor: 'pointer' }
 };
 
 export default RewardStore;

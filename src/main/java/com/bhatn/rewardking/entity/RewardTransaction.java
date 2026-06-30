@@ -45,6 +45,9 @@ public class RewardTransaction {
     @Column(length = 500)
     private String razorpayPayoutId;
 
+    @Column(name = "tracking_number")
+    private String trackingNumber;
+
     public enum TransactionStatus {
         PENDING,
         COMPLETED,

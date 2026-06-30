@@ -64,6 +64,7 @@ function App() {
                 <div style={styles.navLinks}>
                   <Link to="/" style={styles.link}>My Rewards</Link>
                   <Link to="/store" style={styles.link}>Store</Link> {/* Added Quick Store Link */}
+                  <Link to="/profile" style={styles.link}>👤 Profile</Link>
                   {isAdmin && (
                     <Link to="/admin" style={styles.adminLink}>🔒 Admin Panel</Link>
                   )}

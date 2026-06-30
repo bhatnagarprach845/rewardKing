@@ -3,7 +3,9 @@ package com.bhatn.rewardking.controller;
 import com.bhatn.rewardking.dto.PayoutStatusResponse;
 import com.bhatn.rewardking.entity.RewardTransaction;
 import com.bhatn.rewardking.entity.RewardTransaction.TransactionStatus;
+import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.repository.RewardTransactionRepository;
+import com.bhatn.rewardking.repository.WalletRepository;
 import com.bhatn.rewardking.service.RewardService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,54 @@ public class RewardController {
 
     private final RewardService rewardService;
     private final RewardTransactionRepository transactionRepository;
+    private final WalletRepository walletRepository;
+
+    /**
+     * Fetch the authenticated user's profile card information.
+     */
+    @GetMapping("/users/profile")
+    public ResponseEntity<?> getUserProfile(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized."));
+
+        String userId = extractUserId(jwt);
+        // Reuse your wallet repository entry since it already holds name and email fields securely!
+        UserWallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Profile database line missing."));
+
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("name", wallet.getFullName());
+        profile.put("email", wallet.getEmail());
+        profile.put("address", wallet.getAddress() != null ? wallet.getAddress() : "");
+        profile.put("phoneNumber", wallet.getPhonenumber() != null ? wallet.getPhonenumber() : "");
+        //profile.put("upiId", wallet.getUpiId() != null ? wallet.getUpiId() : "");
+
+        return ResponseEntity.ok().body(profile);
+    }
+
+    /**
+     * Save/Update the user's phone number and shipping address fields.
+     */
+    @PostMapping("/users/profile/update")
+    public ResponseEntity<?> updateUserProfile(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody Map<String, String> payload) {
+
+        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized."));
+
+        String userId = extractUserId(jwt);
+        UserWallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Profile line missing."));
+
+        // Persist the inputs into your user_wallets columns
+        wallet.setAddress(payload.get("address"));
+        wallet.setPhonenumber(payload.get("phoneNumber"));
+        if(payload.containsKey("upiId")) {
+           // wallet.setUpiId(payload.get("upiId"));
+        }
+
+        walletRepository.save(wallet);
+        return ResponseEntity.ok().body(Map.of("message", "Profile tracking matrix synchronized successfully!"));
+    }
 
     /**
      * Fetch user's current points balance and historical points ledger.

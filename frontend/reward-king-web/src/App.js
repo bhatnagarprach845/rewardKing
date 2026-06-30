@@ -7,6 +7,7 @@ import '@aws-amplify/ui-react/styles.css';
 import Dashboard from './Dashboard';
 import FileUpload from './FileUpload';
 import AdminDashboard from './AdminDashboard';
+import AdminDashboard from './UserProfile';
 import RewardStore from './RewardStore'; // 🚀 IMPORTED YOUR NEW COMPONENT
 
 Amplify.configure({
@@ -88,6 +89,8 @@ function App() {
                   path="/admin"
                   element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />}
                 />
+                
+                <Route path="/profile" element={<UserProfile />} />
 
                 {/* Catch-all fallback path */}
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -28,6 +28,12 @@ public class UserWallet {
     @Column(name = "email")
     private String email;
 
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "phonenumber")
+    private String phonenumber;
+
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 

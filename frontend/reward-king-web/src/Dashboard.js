@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 const BASE_URL = `${HOST}/api/v1`;
 
+// 🚀 FIX 1: Catalog dictionary lookup defined cleanly at module scope
 const ITEM_NAME_LOOKUP = {
     'item_01': 'Premium Coffee Mug',
     'item_02': 'Wireless Charging Pad',
@@ -57,6 +58,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
 
     return (
         <>
+            {/* Balance Overview Card */}
             <div style={styles.card}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h2 style={{ color: '#28a745', margin: 0, fontSize: '18px' }}>Welcome, {username}!</h2>
@@ -91,65 +93,57 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 </div>
             </div>
 
-            {/* Recent Activity Transaction History Ledger Section */}
-                <div style={styles.historyCard}>
-                    <h3 style={{ color: '#333', margin: '0 0 15px 0', fontSize: '16px', textAlign: 'left' }}>
-                        Points History Ledger
-                    </h3>
+            {/* Financial Points Ledger Section */}
+            <div style={styles.historyCard}>
+                <h3 style={{ color: '#333', margin: '0 0 15px 0', fontSize: '16px', textAlign: 'left' }}>
+                    Points History Ledger
+                </h3>
 
-                    {!data.recentTransactions || data.recentTransactions.length === 0 ? (
-                        <p style={{ fontSize: '13px', color: '#777', textAlign: 'center', margin: '20px 0' }}>
-                            No points movements logged yet. Upload a receipt to start earning points!
-                        </p>
-                    ) : (
-                        /* 🚀 SCROLLABLE WRAPPER CONTAINER ADDED HERE */
-                        <div style={styles.scrollContainer}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {data.recentTransactions.map((tx) => {
-                                    const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
-                                    const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
-                                    const displayType = isCredit ? 'EARNED' : 'REDEEMED';
-                                    const displayDate = tx.processedAt ? tx.processedAt.split('T')[0] : (tx.date || 'Recent');
-                                    let financialStatus = tx.status || 'PENDING';
-                                    if (financialStatus === 'APPROVED' || financialStatus === 'SHIPPED' || financialStatus === 'DELIVERED') {
-                                        financialStatus = 'COMPLETED';
-                                    }
+                {!data.recentTransactions || data.recentTransactions.length === 0 ? (
+                    <p style={{ fontSize: '13px', color: '#777', textAlign: 'center', margin: '20px 0' }}>
+                        No points movements logged yet. Upload a receipt to start earning points!
+                    </p>
+                ) : (
+                    <div style={styles.scrollContainer}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {data.recentTransactions.map((tx) => {
+                                const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
+                                const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
+                                const displayType = isCredit ? 'EARNED' : 'REDEEMED';
+                                const displayDate = tx.date || (tx.processedAt ? tx.processedAt.split('T')[0] : 'Recent');
 
-                                    return (
-                                        <div key={tx.id || Math.random()} style={styles.txRow}>
-                                            <div style={{ textAlign: 'left', maxWidth: '65%' }}>
-                                                <span style={{
-                                                    ...styles.txTypeBadge,
-                                                    backgroundColor: isCredit ? '#e8f5e9' : '#ffebee',
-                                                    color: isCredit ? '#28a745' : '#dc3545'
-                                                }}>
-                                                    {displayType}
-                                                </span>
-                                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginTop: '6px' }}>
-                                                    {tx.notes || (isCredit ? 'Receipt Scanning Allocation' : 'Merchandise Reward Checkout')}
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: '#777', marginTop: '4px' }}>{displayDate}</div>
+                                // 🚀 FIX 2: STRICT FINANCIAL COLLAPSING
+                                // Anything that isn't explicitly PENDING or REDEEMED is completed financially
+                                let financialStatus = 'COMPLETED';
+                                if (tx.status === 'PENDING' || tx.status === 'REDEEMED') {
+                                    financialStatus = 'PENDING';
+                                }
+
+                                return (
+                                    <div key={tx.id || Math.random()} style={styles.txRow}>
+                                        <div style={{ textAlign: 'left', maxWidth: '65%' }}>
+                                            <span style={{
+                                                ...styles.txTypeBadge,
+                                                backgroundColor: isCredit ? '#e8f5e9' : '#ffebee',
+                                                color: isCredit ? '#28a745' : '#dc3545'
+                                            }}>
+                                                {displayType}
+                                            </span>
+                                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', marginTop: '6px' }}>
+                                                {tx.notes || (isCredit ? 'Receipt Scanning Allocation' : 'Merchandise Reward Checkout')}
                                             </div>
-
-                                            <div style={{ textAlign: 'right' }}>
-                                                <span style={{
-                                                    fontSize: '15px',
-                                                    fontWeight: 'bold',
-                                                    color: isCredit ? '#28a745' : '#dc3545'
-                                                }}>
-                                                    {isCredit ? '+' : '-'} {Math.round(rawAmount).toLocaleString()} pts
-                                                </span>
-                                                <div style={{
-                                                    fontSize: '11px',
-                                                    fontWeight: 'bold',
-                                                    color: tx.status === 'COMPLETED' || tx.status === 'APPROVED' ? '#28a745' : '#f39c12',
-                                                    marginTop: '4px'
-                                                }}>
-                                                    {tx.status || 'PENDING'}
-                                                </div>
-                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#777', marginTop: '4px' }}>{displayDate}</div>
                                         </div>
-                                        <div style={{
+
+                                        <div style={{ textAlign: 'right' }}>
+                                            <span style={{
+                                                fontSize: '15px',
+                                                fontWeight: 'bold',
+                                                color: isCredit ? '#28a745' : '#dc3545'
+                                            }}>
+                                                {isCredit ? '+' : '-'} {Math.round(rawAmount).toLocaleString()} pts
+                                            </span>
+                                            <div style={{
                                                 fontSize: '11px',
                                                 fontWeight: 'bold',
                                                 color: financialStatus === 'COMPLETED' ? '#28a745' : '#f39c12',
@@ -157,85 +151,89 @@ const Dashboard = ({ refreshTrigger, username }) => {
                                             }}>
                                                 {financialStatus}
                                             </div>
-                                    );
-                                })}
-                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    )}
-                </div>
-            {/* 🚀 FIXED: Order Tracking Grid mapping clean names and grouping unique IDs together */}
-                <div style={styles.historyCard}>
-                    <h3 style={{ color: '#333', margin: '0 0 15px 0', fontSize: '16px', textAlign: 'left' }}>
-                        📦 My Ordered Merchandise
-                    </h3>
+                    </div>
+                )}
+            </div>
 
-                    {!data.recentTransactions || !data.recentTransactions.some(tx => tx.type === 'REDEEMED') ? (
-                        <p style={{ fontSize: '13px', color: '#777', textAlign: 'center', margin: '20px 0' }}>
-                            You haven't ordered any premium rewards yet!
-                        </p>
-                    ) : (
-                        <table style={styles.orderTable}>
-                            <thead>
-                                <tr style={styles.orderHeaderRow}>
-                                    <th style={styles.th}>Item Description</th>
-                                    <th style={{ ...styles.th, textAlign: 'right' }}>Delivery Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Object.values(
-                                    data.recentTransactions
-                                        .filter(tx => tx.type === 'REDEEMED')
-                                        .reduce((acc, tx) => {
-                                            const rawId = tx.notes ? tx.notes.replace('Order Placement: ', '') : 'item_01';
+            {/* Merchandise Delivery Tracking Section */}
+            <div style={styles.historyCard}>
+                <h3 style={{ color: '#333', margin: '0 0 15px 0', fontSize: '16px', textAlign: 'left' }}>
+                    📦 My Ordered Merchandise
+                </h3>
 
-                                            // If we have an existing row record for this exact transaction ID, keep the most advanced status
-                                            if (!acc[tx.id]) {
-                                                acc[tx.id] = {
-                                                    id: tx.id,
-                                                    rawId: rawId,
-                                                    name: ITEM_NAME_LOOKUP[rawId] || rawId,
-                                                    status: tx.status || 'PENDING'
-                                                };
-                                            }
-                                            return acc;
-                                        }, {})
-                                ).map((order) => {
-                                    // Dynamic color assignment based on actual database record status updates
-                                    let statusColor = '#f39c12'; // PENDING / REDEEMED
-                                    if (order.status === 'APPROVED' || order.status === 'COMPLETED') statusColor = '#27ae60'; // APPROVED
-                                    if (order.status === 'SHIPPED') statusColor = '#3498db'; // SHIPPED Blue
-                                    if (order.status === 'DELIVERED') statusColor = '#28a745'; // DELIVERED Green
+                {!data.recentTransactions || !data.recentTransactions.some(tx => tx.type === 'REDEEMED') ? (
+                    <p style={{ fontSize: '13px', color: '#777', textAlign: 'center', margin: '20px 0' }}>
+                        You haven't ordered any premium rewards yet!
+                    </p>
+                ) : (
+                    <table style={styles.orderTable}>
+                        <thead>
+                            <tr style={styles.orderHeaderRow}>
+                                <th style={styles.th}>Item Description</th>
+                                <th style={{ ...styles.th, textAlign: 'right' }}>Delivery Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.values(
+                                data.recentTransactions
+                                    .filter(tx => tx.type === 'REDEEMED')
+                                    .reduce((acc, tx) => {
+                                        // Normalize notes field strings cleanly
+                                        const parsedId = tx.notes
+                                            ? tx.notes.replace('Order Placement: ', '').replace('Redeeemed item catalog identifier: ', '').trim()
+                                            : 'item_01';
 
-                                    let displayStatus = order.status;
-                                    if (displayStatus === 'COMPLETED') displayStatus = 'APPROVED';
+                                        if (!acc[tx.id]) {
+                                            acc[tx.id] = {
+                                                id: tx.id,
+                                                // 🚀 FIX 1: Use parsedId to map directly against dictionary values
+                                                name: ITEM_NAME_LOOKUP[parsedId] || parsedId,
+                                                status: tx.status || 'PENDING'
+                                            };
+                                        }
+                                        return acc;
+                                    }, {})
+                            ).map((order) => {
+                                let statusColor = '#f39c12'; // PENDING gold
+                                if (order.status === 'APPROVED' || order.status === 'COMPLETED') statusColor = '#27ae60'; // Green
+                                if (order.status === 'SHIPPED') statusColor = '#3498db'; // Blue
+                                if (order.status === 'DELIVERED') statusColor = '#28a745'; // Green
 
-                                    return (
-                                        <tr key={order.id} style={styles.orderRow}>
-                                            <td style={styles.td}>
-                                                <strong style={{ color: '#333' }}>{order.name}</strong>
-                                                <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>Order ref: #{order.id}</div>
-                                            </td>
-                                            <td style={{ ...styles.td, textAlign: 'right' }}>
-                                                <span style={{
-                                                    backgroundColor: statusColor + '15',
-                                                    color: statusColor,
-                                                    padding: '4px 10px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 'bold',
-                                                    textTransform: 'uppercase',
-                                                    border: `1px solid ${statusColor}`
-                                                }}>
-                                                    {displayStatus}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                                let displayStatus = order.status;
+                                if (displayStatus === 'COMPLETED') displayStatus = 'APPROVED';
+
+                                return (
+                                    <tr key={order.id} style={styles.orderRow}>
+                                        <td style={styles.td}>
+                                            <strong style={{ color: '#333' }}>{order.name}</strong>
+                                            <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>Order ref: #{order.id}</div>
+                                        </td>
+                                        <td style={{ ...styles.td, textAlign: 'right' }}>
+                                            <span style={{
+                                                backgroundColor: statusColor + '15',
+                                                color: statusColor,
+                                                padding: '4px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '11px',
+                                                fontWeight: 'bold',
+                                                textTransform: 'uppercase',
+                                                border: `1px solid ${statusColor}`
+                                            }}>
+                                                {displayStatus}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </>
     );
 };
@@ -257,8 +255,6 @@ const styles = {
         paddingRight: '6px',
         scrollbarWidth: 'thin'
     },
-
-    // 🚀 FIXED: Added missing table styles to prevent formatting drops
     orderTable: { width: '100%', borderCollapse: 'collapse', marginTop: '10px' },
     orderHeaderRow: { borderBottom: '2px solid #eee', paddingBottom: '8px' },
     orderRow: { borderBottom: '1px solid #f0f0f0' },

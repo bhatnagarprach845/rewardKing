@@ -248,16 +248,13 @@ const AdminDashboard = () => {
    const renderProfileTab = () => {
            if (!userDetails) return null;
            const userWallet = (wallets || []).find(w => String(w.userId) === String(selectedUser.id));
-
            const balance = userWallet?.availablePoints || userWallet?.currentBalance || 0;
 
-           // 🚀 CRITICAL RE-MAPPING: Capture all transactional order flags to keep tracking them until delivered!
-           const trackingOrder = (payouts || []).find(p =>
+           // 🚀 FIX: Grab ALL matching active fulfillment items instead of just the first one!
+           const trackingOrders = (payouts || []).filter(p =>
                p.userId === selectedUser.id &&
                (p.status === 'REDEEMED' || p.status === 'PENDING' || p.status === 'APPROVED' || p.status === 'COMPLETED' || p.status === 'SHIPPED')
            );
-
-           const absoluteAmount = trackingOrder ? Math.abs(trackingOrder.amountAwarded || trackingOrder.pointsAmount || trackingOrder.amount || 0) : 0;
 
            return (
                <div style={styles.contentBox}>
@@ -269,35 +266,54 @@ const AdminDashboard = () => {
                        </span>
                    </p>
 
-                   {trackingOrder ? (
-                       <div style={{ border: '1px dashed #f39c12', padding: '15px', marginTop: '15px', borderRadius: '8px', backgroundColor: '#2c1d0a' }}>
-                           <p style={{ color: '#f39c12', margin: '0 0 8px 0', fontWeight: 'bold' }}>⚠️ Order Fulfillment Line (ID: #{trackingOrder.id})</p>
-                           <p><strong>Items Ordered:</strong> {trackingOrder.notes || 'Redemption Package'}</p>
-                           <p><strong>Current Stage Status:</strong> <span style={{ color: '#ffc107', fontWeight: 'bold' }}>{trackingOrder.status}</span></p>
-                           <p><strong>Escrow Deducted Points:</strong> {absoluteAmount} pts</p>
+                   <h4 style={{ color: '#ccc', marginTop: '20px', borderBottom: '1px solid #333', paddingBottom: '5px' }}>
+                       Active Fulfillment Queue ({trackingOrders.length})
+                   </h4>
 
-                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' }}>
-                               {/* Dynamic buttons to progress down your warehouse chain */}
-                               {(trackingOrder.status === 'PENDING' || trackingOrder.status === 'REDEEMED') && (
-                                   <button onClick={() => handleUpdateStatus(trackingOrder.id, 'APPROVED')} style={styles.payoutBtn}>
-                                       ✅ Approve Order Request
-                                   </button>
-                               )}
+                   {trackingOrders.length > 0 ? (
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '10px' }}>
+                           {/* 🚀 FIX: Loop through each item individually so they render as separate action cards */}
+                           {trackingOrders.map((order) => {
+                               const absoluteAmount = Math.abs(order.amountAwarded || order.pointsAmount || order.amount || 0);
 
-                               {(trackingOrder.status === 'APPROVED' || trackingOrder.status === 'COMPLETED') && (
-                                   <button onClick={() => handleUpdateStatus(trackingOrder.id, 'SHIPPED')} style={{ ...styles.payoutBtn, backgroundColor: '#3498db' }}>
-                                       🚀 Dispatch & Mark as SHIPPED
-                                   </button>
-                               )}
+                               return (
+                                   <div key={order.id} style={{ border: '1px dashed #f39c12', padding: '15px', borderRadius: '8px', backgroundColor: '#2c1d0a' }}>
+                                       <p style={{ color: '#f39c12', margin: '0 0 8px 0', fontWeight: 'bold' }}>
+                                           📦 Order Line (ID: #{order.id})
+                                       </p>
+                                       <p><strong>Items Ordered:</strong> {order.notes || 'Redemption Package'}</p>
+                                       <p><strong>Current Stage Status:</strong> <span style={{ color: '#ffc107', fontWeight: 'bold' }}>{order.status}</span></p>
+                                       <p><strong>Escrow Deducted Points:</strong> {absoluteAmount} pts</p>
 
-                               {trackingOrder.status === 'SHIPPED' && (
-                                   <button onClick={() => handleUpdateStatus(trackingOrder.id, 'DELIVERED')} style={{ ...styles.payoutBtn, backgroundColor: '#28a745' }}>
-                                       📦 Confirm Arrival & Mark as DELIVERED
-                                   </button>
-                               )}
-                           </div>
+                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                                           {/* Target individual unique transaction IDs dynamically */}
+                                           {(order.status === 'PENDING' || order.status === 'REDEEMED') && (
+                                               <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={styles.payoutBtn}>
+                                                   ✅ Approve Order Request
+                                               </button>
+                                           )}
+
+                                           {(order.status === 'APPROVED' || order.status === 'COMPLETED') && (
+                                               <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ ...styles.payoutBtn, backgroundColor: '#3498db' }}>
+                                                   🚀 Dispatch & Mark as SHIPPED
+                                               </button>
+                                           )}
+
+                                           {order.status === 'SHIPPED' && (
+                                               <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ ...styles.payoutBtn, backgroundColor: '#28a745' }}>
+                                                   📦 Confirm Arrival & Mark as DELIVERED
+                                               </button>
+                                           )}
+                                       </div>
+                                   </div>
+                               );
+                           })}
                        </div>
-                   ) : <p style={{ color: '#888', fontStyle: 'italic', marginTop: '15px' }}>No items inside processing lines or queues currently.</p>}
+                   ) : (
+                       <p style={{ color: '#888', fontStyle: 'italic', marginTop: '15px' }}>
+                           No items inside processing lines or queues currently.
+                       </p>
+                   )}
                </div>
            );
        };

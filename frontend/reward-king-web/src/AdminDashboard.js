@@ -146,6 +146,41 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleUpdateStatus = async (transactionId, newStatus) => {
+            if (!window.confirm(`Are you sure you want to transition this order status to ${newStatus}?`)) return;
+
+            setIsSyncing(true);
+            try {
+                const headers = await getAuthHeader();
+
+                // 🚀 Matches your backend signature parameter contract: /payouts/update-status/{id}?newStatus=VALUE
+                const res = await axios.post(
+                    `${BASE_URL}/payouts/update-status/${transactionId}?newStatus=${newStatus}`,
+                    {},
+                    { headers }
+                );
+
+                // 🚀 AWS LAMBDA SAFETY UNBOXING
+                let responseData = res.data;
+                if (responseData && typeof responseData.body === 'string') {
+                    responseData = JSON.parse(responseData.body);
+                }
+
+                // Fallback to reload fresh arrays across your screen instantly
+                await Promise.all([
+                    fetchInitialData(),
+                    fetchUserDrillDown()
+                ]);
+
+                alert(`Success! Order status updated to: ${newStatus}`);
+            } catch (err) {
+                console.error(`Prachi Admin :: Failed to shift transaction state to ${newStatus}:`, err);
+                alert("Error: " + (err.response?.data?.error || "Server processing validation failed. Check mappings."));
+            } finally {
+                setIsSyncing(false);
+            }
+        };
+
     const downloadReceiptItems = (receipt) => {
         const headers = "Description,Quantity,Unit Price,Total Price\n";
         const rows = receipt.items.map(i =>
@@ -210,41 +245,62 @@ const AdminDashboard = () => {
     };
 
     // --- Sub-Components (Render Helpers) ---
-    const renderProfileTab = () => {
-        if (!userDetails) return null;
-        const userWallet = (wallets || []).find(w => String(w.userId) === String(selectedUser.id));
+   const renderProfileTab = () => {
+           if (!userDetails) return null;
+           const userWallet = (wallets || []).find(w => String(w.userId) === String(selectedUser.id));
 
-        const balance = userWallet?.availablePoints || userWallet?.currentBalance || 0;
-        const pendingReq = (payouts || []).find(p => p.userId === selectedUser.id && (p.status === 'REDEEMED' || p.status === 'PENDING'));
-        const absoluteAmount = pendingReq ? Math.abs(pendingReq.amountAwarded || pendingReq.pointsAmount || pendingReq.amount || 0) : 0;
+           const balance = userWallet?.availablePoints || userWallet?.currentBalance || 0;
 
-        return (
-            <div style={styles.contentBox}>
-                <p><strong>Email:</strong> {userDetails.email}</p>
-                <p><strong>UPI ID:</strong> {userDetails.upiId || 'N/A'}</p>
-                <p><strong>Wallet Balance:</strong>
-                    <span style={{ color: animatingBalance !== null ? '#dc3545' : '#28a745', fontWeight: 'bold', marginLeft: '10px' }}>
-                        {animatingBalance !== null ? `${animatingBalance} pts` : `${balance.toLocaleString()} pts`}
-                    </span>
-                </p>
+           // 🚀 CRITICAL RE-MAPPING: Capture all transactional order flags to keep tracking them until delivered!
+           const trackingOrder = (payouts || []).find(p =>
+               p.userId === selectedUser.id &&
+               (p.status === 'REDEEMED' || p.status === 'PENDING' || p.status === 'APPROVED' || p.status === 'COMPLETED' || p.status === 'SHIPPED')
+           );
 
-                {pendingReq ? (
-                    <div style={{ border: '1px dashed #f39c12', padding: '15px', marginTop: '15px', borderRadius: '8px', backgroundColor: '#2c1d0a' }}>
-                        <p style={{ color: '#f39c12', margin: '0 0 8px 0', fontWeight: 'bold' }}>⚠️ Pending Fulfillment Queue Notice</p>
-                        <p><strong>Item Catalog Identifiers:</strong> {pendingReq.notes || 'Redemption Merchandise Package'}</p>
-                        <p><strong>Deduction Cost Hold:</strong> {absoluteAmount} pts</p>
+           const absoluteAmount = trackingOrder ? Math.abs(trackingOrder.amountAwarded || trackingOrder.pointsAmount || trackingOrder.amount || 0) : 0;
 
-                        <button
-                            onClick={() => handleApprovePayout(pendingReq.id, absoluteAmount)}
-                            style={{ ...styles.payoutBtn, width: '100%', marginTop: '12px' }}
-                        >
-                            Approve & Release Shipment
-                        </button>
-                    </div>
-                ) : <p style={{ color: '#888', fontStyle: 'italic', marginTop: '15px' }}>No items inside processing lines or queues currently.</p>}
-            </div>
-        );
-    };
+           return (
+               <div style={styles.contentBox}>
+                   <p><strong>Email:</strong> {userDetails.email}</p>
+                   <p><strong>UPI ID:</strong> {userDetails.upiId || 'N/A'}</p>
+                   <p><strong>Wallet Balance:</strong>
+                       <span style={{ color: animatingBalance !== null ? '#dc3545' : '#28a745', fontWeight: 'bold', marginLeft: '10px' }}>
+                           {animatingBalance !== null ? `${animatingBalance} pts` : `${balance.toLocaleString()} pts`}
+                       </span>
+                   </p>
+
+                   {trackingOrder ? (
+                       <div style={{ border: '1px dashed #f39c12', padding: '15px', marginTop: '15px', borderRadius: '8px', backgroundColor: '#2c1d0a' }}>
+                           <p style={{ color: '#f39c12', margin: '0 0 8px 0', fontWeight: 'bold' }}>⚠️ Order Fulfillment Line (ID: #{trackingOrder.id})</p>
+                           <p><strong>Items Ordered:</strong> {trackingOrder.notes || 'Redemption Package'}</p>
+                           <p><strong>Current Stage Status:</strong> <span style={{ color: '#ffc107', fontWeight: 'bold' }}>{trackingOrder.status}</span></p>
+                           <p><strong>Escrow Deducted Points:</strong> {absoluteAmount} pts</p>
+
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' }}>
+                               {/* Dynamic buttons to progress down your warehouse chain */}
+                               {(trackingOrder.status === 'PENDING' || trackingOrder.status === 'REDEEMED') && (
+                                   <button onClick={() => handleUpdateStatus(trackingOrder.id, 'APPROVED')} style={styles.payoutBtn}>
+                                       ✅ Approve Order Request
+                                   </button>
+                               )}
+
+                               {(trackingOrder.status === 'APPROVED' || trackingOrder.status === 'COMPLETED') && (
+                                   <button onClick={() => handleUpdateStatus(trackingOrder.id, 'SHIPPED')} style={{ ...styles.payoutBtn, backgroundColor: '#3498db' }}>
+                                       🚀 Dispatch & Mark as SHIPPED
+                                   </button>
+                               )}
+
+                               {trackingOrder.status === 'SHIPPED' && (
+                                   <button onClick={() => handleUpdateStatus(trackingOrder.id, 'DELIVERED')} style={{ ...styles.payoutBtn, backgroundColor: '#28a745' }}>
+                                       📦 Confirm Arrival & Mark as DELIVERED
+                                   </button>
+                               )}
+                           </div>
+                       </div>
+                   ) : <p style={{ color: '#888', fontStyle: 'italic', marginTop: '15px' }}>No items inside processing lines or queues currently.</p>}
+               </div>
+           );
+       };
 
     return (
         <div style={styles.adminContainer}>

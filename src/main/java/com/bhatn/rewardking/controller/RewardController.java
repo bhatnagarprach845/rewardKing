@@ -90,6 +90,36 @@ public class RewardController {
     }
 
     /**
+     * Update order tracking statuses dynamically (PENDING -> APPROVED -> SHIPPED -> DELIVERED)
+     */
+    @PostMapping("/payouts/update-status/{transactionId}")
+    public ResponseEntity<?> updateOrderStatus(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long transactionId,
+            @RequestParam String newStatus) {
+
+        if (jwt == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized access token."));
+        }
+
+        try {
+            RewardTransaction tx = transactionRepository.findById(transactionId)
+                    .orElseThrow(() -> new IllegalArgumentException("Order record not found."));
+
+            // Dynamically cast incoming string parameter to our internal Enum safely
+            tx.setStatus(RewardTransaction.TransactionStatus.valueOf(newStatus.toUpperCase()));
+            tx.setProcessedAt(LocalDateTime.now());
+            transactionRepository.save(tx);
+
+            log.info("Prachi Admin :: Successfully updated order ID {} status to: {}", transactionId, newStatus);
+            return ResponseEntity.ok().body(Map.of("status", "SUCCESS", "currentStatus", newStatus));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid status code sequence requested."));
+        }
+    }
+
+    /**
      * 🚀 ROUTE ALIGNMENT FIX: Handle direct order/payout validations securely
      */
     @PostMapping("/payouts/approve/{transactionId}")

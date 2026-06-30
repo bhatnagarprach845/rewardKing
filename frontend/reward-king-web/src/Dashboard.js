@@ -144,6 +144,65 @@ const Dashboard = ({ refreshTrigger, username }) => {
                         </div>
                     )}
                 </div>
+
+                {/* 🚀 NEW: Dedicated Merchandise Order Tracking Grid matching image_70f999.png */}
+                    <div style={styles.historyCard}>
+                        <h3 style={{ color: '#333', margin: '0 0 15px 0', fontSize: '16px', textAlign: 'left' }}>
+                            📦 My Ordered Merchandise
+                        </h3>
+
+                        {/* Filter recent transactions to only display REDEEMED items */}
+                        {!data.recentTransactions || !data.recentTransactions.some(tx => tx.type === 'REDEEMED') ? (
+                            <p style={{ fontSize: '13px', color: '#777', textAlign: 'center', margin: '20px 0' }}>
+                                You haven't ordered any premium rewards yet!
+                            </p>
+                        ) : (
+                            <table style={styles.orderTable}>
+                                <thead>
+                                    <tr style={styles.orderHeaderRow}>
+                                        <th style={styles.th}>Item Description</th>
+                                        <th style={{ ...styles.th, textAlign: 'right' }}>Delivery Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.recentTransactions
+                                        .filter(tx => tx.type === 'REDEEMED')
+                                        .map((tx) => {
+                                            // Strip away "Order Placement:" prefix if present for clean UI display
+                                            const cleanItemName = tx.notes ? tx.notes.replace('Order Placement: ', '') : 'Premium Package';
+
+                                            // Custom color mapping for delivery state indicators
+                                            let statusColor = '#f39c12'; // Default Pending gold
+                                            if (tx.status === 'SHIPPED') statusColor = '#3498db'; // Shipped Blue
+                                            if (tx.status === 'DELIVERED' || tx.status === 'COMPLETED') statusColor = '#28a745'; // Green
+
+                                            return (
+                                                <tr key={tx.id || Math.random()} style={styles.orderRow}>
+                                                    <td style={styles.td}>
+                                                        <strong style={{ color: '#333' }}>{cleanItemName}</strong>
+                                                        <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>ID: #{tx.id}</div>
+                                                    </td>
+                                                    <td style={{ ...styles.td, textAlign: 'right' }}>
+                                                        <span style={{
+                                                            backgroundColor: statusColor + '15', // Subtle transparent alpha tint
+                                                            color: statusColor,
+                                                            padding: '4px 10px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 'bold',
+                                                            textTransform: 'uppercase',
+                                                            border: `1px solid ${statusColor}`
+                                                        }}>
+                                                            {tx.status === 'COMPLETED' ? 'APPROVED' : tx.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
         </>
     );
 };
@@ -159,14 +218,19 @@ const styles = {
     historyCard: { padding: '20px', border: '1px solid #ddd', borderRadius: '12px', maxWidth: '400px', margin: '15px auto', backgroundColor: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', color: '#333' },
     txRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' },
     txTypeBadge: { fontSize: '10px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '12px', letterSpacing: '0.5px' },
-
-    // 🚀 SCROLL ENGINE INTERFACE RULES ADDED HERE:
     scrollContainer: {
-        maxHeight: '280px',          // Limits how tall the list can grow
-        overflowY: 'auto',           // Triggers a vertical scrollbar automatically when item limits are reached
-        paddingRight: '6px',         // Keeps items from crowding the scroll wheel line
-        scrollbarWidth: 'thin'       // Uses a modern, subtle scroll layout profile on supporting browsers
-    }
+        maxHeight: '280px',
+        overflowY: 'auto',
+        paddingRight: '6px',
+        scrollbarWidth: 'thin'
+    },
+
+    // 🚀 FIXED: Added missing table styles to prevent formatting drops
+    orderTable: { width: '100%', borderCollapse: 'collapse', marginTop: '10px' },
+    orderHeaderRow: { borderBottom: '2px solid #eee', paddingBottom: '8px' },
+    orderRow: { borderBottom: '1px solid #f0f0f0' },
+    th: { fontSize: '13px', color: '#666', fontWeight: 'bold', paddingBottom: '8px', textAlign: 'left' },
+    td: { padding: '12px 0', verticalAlign: 'middle', fontSize: '13px' }
 };
 
 export default Dashboard;

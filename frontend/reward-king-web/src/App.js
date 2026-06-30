@@ -7,7 +7,7 @@ import '@aws-amplify/ui-react/styles.css';
 import Dashboard from './Dashboard';
 import FileUpload from './FileUpload';
 import AdminDashboard from './AdminDashboard';
-import AdminDashboard from './UserProfile';
+import UserProfile from './UserProfile';
 import RewardStore from './RewardStore'; // 🚀 IMPORTED YOUR NEW COMPONENT
 
 Amplify.configure({

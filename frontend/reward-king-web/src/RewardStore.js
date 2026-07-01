@@ -51,6 +51,18 @@ const RewardStore = () => {
         }
     };
 
+    // 🚀 NEW: Function to remove a single unit or an item entirely from the cart
+    const removeFromCart = (itemId) => {
+        const existingItem = cart.find(i => i.itemId === itemId);
+        if (!existingItem) return;
+
+        if (existingItem.quantity > 1) {
+            setCart(cart.map(i => i.itemId === itemId ? { ...i, quantity: i.quantity - 1 } : i));
+        } else {
+            setCart(cart.filter(i => i.itemId !== itemId));
+        }
+    };
+
     const getCartTotal = () => cart.reduce((sum, item) => sum + (item.pointsCost * item.quantity), 0);
 
     const handleCheckout = async () => {
@@ -108,15 +120,22 @@ const RewardStore = () => {
                     <div style={styles.grid}>
                         {catalog.map(item => {
                             const isOutOfStock = item.stockLevel <= 0;
+                            // 🚀 HIGHLIGHT RULE CHECK: Highlight border in green only if user can afford it
+                            const canAfford = userPoints >= item.pointsCost;
+                            const dynamicCardStyle = {
+                                ...styles.catalogCard,
+                                border: canAfford ? '2px solid #28a745' : '1px solid #ddd',
+                                boxShadow: canAfford ? '0 4px 12px rgba(40, 167, 69, 0.2)' : 'none'
+                            };
+
                             return (
-                                <div key={item.itemId} style={styles.catalogCard}>
+                                <div key={item.itemId} style={dynamicCardStyle}>
                                     <div style={styles.itemImage}>{item.imageEmoji}</div>
                                     <h3 style={styles.itemName}>{item.name}</h3>
                                     <p style={styles.itemDesc}>{item.description}</p>
                                     <p style={{fontSize: '11px', color: isOutOfStock ? '#dc3545' : '#888'}}>Stock: {item.stockLevel} left</p>
                                     <div style={styles.actionRow}>
                                         <span style={styles.priceTag}>{item.pointsCost} pts</span>
-                                        {/* 🚀 OUT OF STOCK AUTOMATIC BUTTON DISABLE */}
                                         <button
                                             onClick={() => addToCart(item)}
                                             disabled={isOutOfStock}
@@ -131,19 +150,31 @@ const RewardStore = () => {
                     </div>
                 </div>
 
-                {/* Right Side Basket */}
+                {/* Basket Display panel */}
                 <div style={styles.cartSide}>
                     <h3>🛒 Your Basket</h3>
                     {cart.map(i => (
                         <div key={i.itemId} style={styles.cartRow}>
-                            <div>{i.name} (x{i.quantity})</div>
-                            <div>{i.pointsCost * i.quantity} pts</div>
+                            <div>
+                                <strong>{i.name}</strong>
+                                <div style={{ color: '#666', fontSize: '11px' }}>Qty: {i.quantity} ({i.pointsCost * i.quantity} pts)</div>
+                            </div>
+                            {/* 🚀 NEW: Delete/Remove Single Action Button */}
+                            <button
+                                onClick={() => removeFromCart(i.itemId)}
+                                style={styles.removeBtn}
+                                title="Remove one unit"
+                            >
+                                ❌
+                            </button>
                         </div>
                     ))}
-                    {cart.length > 0 && (
+                    {cart.length > 0 ? (
                         <button onClick={handleCheckout} disabled={isPurchasing} style={styles.checkoutBtn}>
                             Checkout Basket ({getCartTotal()} pts)
                         </button>
+                    ) : (
+                        <p style={{ fontSize: '12px', color: '#888', textAlign: 'center', marginTop: '15px' }}>Your basket is currently empty.</p>
                     )}
                 </div>
             </div>
@@ -151,25 +182,25 @@ const RewardStore = () => {
     );
 };
 
-// Styles mapped to extensions dynamically
 const styles = {
     container: { padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'Arial, sans-serif' },
     headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', backgroundColor: '#f8f9fa', padding: '15px 20px', borderRadius: '12px' },
-    backBtn: { padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    backBtn: { padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', border: '1px solid #ccc', backgroundColor: '#fff' },
     pointsDisplay: { fontSize: '16px', color: '#333' },
     alertBanner: { backgroundColor: '#dc3545', color: 'white', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' },
     mainLayout: { display: 'flex', gap: '30px', flexWrap: 'wrap' },
     catalogSide: { flex: '3 1 600px', color: '#fff' },
-    cartSide: { flex: '1 1 320px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '20px', color: '#333' },
+    cartSide: { flex: '1 1 320px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '20px', color: '#333', height: 'fit-content' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' },
-    catalogCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', color: '#333' },
+    catalogCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', color: '#333', transition: 'all 0.2s ease-in-out' },
     itemImage: { fontSize: '40px', textAlign: 'center' },
     itemName: { fontSize: '15px', fontWeight: 'bold' },
     itemDesc: { fontSize: '12px', color: '#666', flexGrow: 1 },
-    actionRow: { display: 'flex', justifyContent: 'space-between', marginTop: '15px' },
+    actionRow: { display: 'flex', justifyContent: 'space-between', marginTop: '15px', alignItems: 'center' },
     priceTag: { fontWeight: 'bold', color: '#28a745' },
-    addToCartBtn: { color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' },
-    cartRow: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #ddd', fontSize: '13px' },
+    addToCartBtn: { color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
+    cartRow: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: '13px', alignItems: 'center' },
+    removeBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '5px', borderRadius: '4px', transition: 'background 0.2s', ':hover': { background: '#eee' } },
     checkoutBtn: { width: '100%', backgroundColor: '#28a745', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', marginTop: '15px', fontWeight: 'bold', cursor: 'pointer' }
 };
 

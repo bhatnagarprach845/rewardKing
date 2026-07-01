@@ -101,7 +101,10 @@ const Dashboard = ({ refreshTrigger, username }) => {
                             {allTransactions.map((tx) => {
                                 const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
                                 const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
-
+                                let financialStatus = 'COMPLETED';
+                                    if (tx.status === 'PENDING' || tx.status === 'REDEEMED') {
+                                        financialStatus = 'PENDING';
+                                    }
                                 return (
                                     <div key={tx.id || Math.random()} style={styles.ledgerRow}>
                                         <div style={{ textAlign: 'left', maxWidth: '70%' }}>
@@ -128,8 +131,8 @@ const Dashboard = ({ refreshTrigger, username }) => {
                                             }}>
                                                 {isCredit ? '+' : '-'} {Math.round(rawAmount).toLocaleString()} pts
                                             </span>
-                                            <div style={{ fontSize: '10px', color: '#777', marginTop: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                                                {tx.status}
+                                            <div style={{ fontSize: '10px', color: financialStatus === 'COMPLETED' ? '#28a745' : '#f39c12', marginTop: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                                                {financialStatus}
                                             </div>
                                         </div>
                                     </div>

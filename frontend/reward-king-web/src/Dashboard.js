@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from './apiClient';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = ({ refreshTrigger, username }) => {
+const navigate = useNavigate(); // 🚀 INSTANT MEMORY MIGRATIONS LINK
     const [data, setData] = useState(null);
     const [activeFulfillmentTab, setActiveFulfillmentTab] = useState('ACTIVE');
 
@@ -42,7 +44,12 @@ const Dashboard = ({ refreshTrigger, username }) => {
                 <p style={{ fontSize: '11px', marginTop: '5px' }}>
                     Target Milestone Runway Tracker: Progress toward {dynamicMilestoneTarget} pts
                 </p>
-                <button onClick={() => window.location.href='/store'} style={styles.shopBtn}>Spend Points</button>
+                <button
+                    onClick={() => navigate('/store')} // 🚀 CHANGED: Zero-latency instantaneous client load!
+                    style={styles.shopBtn}
+                >
+                    Spend Points
+                </button>
             </div>
 
             {/* 📦 MODULE A: Merchandise Fulfillment Delivery Statuses */}

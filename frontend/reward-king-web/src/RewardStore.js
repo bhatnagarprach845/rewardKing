@@ -120,13 +120,15 @@ const RewardStore = () => {
                     <div style={styles.grid}>
                         {catalog.map(item => {
                             const isOutOfStock = item.stockLevel <= 0;
-                            // 🚀 HIGHLIGHT RULE CHECK: Highlight border in green only if user can afford it
-                            const canAfford = userPoints >= item.pointsCost;
-                            const dynamicCardStyle = {
-                                ...styles.catalogCard,
-                                border: canAfford ? '2px solid #28a745' : '1px solid #ddd',
-                                boxShadow: canAfford ? '0 4px 12px rgba(40, 167, 69, 0.2)' : 'none'
-                            };
+                            // 🚀 IMPROVED VISUAL UNIFORMITY FOR UNAVAILABLE ITEMS
+                                const dynamicCardStyle = {
+                                    ...styles.catalogCard,
+                                    border: isOutOfStock ? '1px solid #dc3545' : (canAfford ? '2px solid #28a745' : '1px solid #ddd'),
+                                    boxShadow: (!isOutOfStock && canAfford) ? '0 4px 12px rgba(40, 167, 69, 0.15)' : 'none',
+                                    backgroundColor: (isOutOfStock || !canAfford) ? '#f8f9fa' : '#fff', // Light grey out
+                                    opacity: (isOutOfStock || !canAfford) ? 0.6 : 1, // Visual fade
+                                    cursor: (isOutOfStock || !canAfford) ? 'not-allowed' : 'default'
+                                };
 
                             return (
                                 <div key={item.itemId} style={dynamicCardStyle}>
@@ -137,10 +139,18 @@ const RewardStore = () => {
                                     <div style={styles.actionRow}>
                                         <span style={styles.priceTag}>{item.pointsCost} pts</span>
                                         <button
-                                            onClick={() => addToCart(item)}
-                                            disabled={isOutOfStock}
-                                            style={{...styles.addToCartBtn, backgroundColor: isOutOfStock ? '#ccc' : '#007bff'}}
-                                        >
+                                        // 🚀 DOUBLE LOCK SAFETIES: Blocks programmatic entry AND pointer interactions
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (!isOutOfStock && canAfford) addToCart(item);
+                                                }}
+                                                disabled={isOutOfStock || !canAfford}
+                                                style={{
+                                                    ...styles.addToCartBtn,
+                                                    backgroundColor: isOutOfStock ? '#ccc' : (!canAfford ? '#dc3545' : '#007bff'),
+                                                    cursor: (isOutOfStock || !canAfford) ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
                                             {isOutOfStock ? 'Out of Stock' : '+ Add to Cart'}
                                         </button>
                                     </div>

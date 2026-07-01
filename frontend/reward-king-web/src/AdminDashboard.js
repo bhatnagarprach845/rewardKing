@@ -7,13 +7,11 @@ const AdminDashboard = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [trackingInput, setTrackingInput] = useState('');
 
-    // Pagination configurations metadata states
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
 
     const fetchInitialData = useCallback(async () => {
         try {
-            // 🚀 FIXED PATHS: Clean api paths configured through global apiClient instance cleanly
             const [walletRes, payoutRes] = await Promise.all([
                 apiClient.get(`/admin/wallets?page=${currentPage}&size=10`),
                 apiClient.get('/admin/payouts')
@@ -34,8 +32,6 @@ const AdminDashboard = () => {
             await apiClient.post(`/admin/payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
             alert("Order status adjusted successfully!");
             setTrackingInput('');
-
-            // 🚀 FIX: Refetch latest data without bumping user back to list screen
             await fetchInitialData();
         } catch (e) {
             alert("Failed to modify tracking configuration parameter mappings.");
@@ -43,23 +39,21 @@ const AdminDashboard = () => {
     };
 
     const renderProfileTab = () => {
-        // Filter out items matching this user
         const trackingOrders = payouts.filter(p => p.userId === selectedUser.id);
 
         return (
             <div style={{ backgroundColor: '#222', padding: '20px', borderRadius: '8px', color: '#fff' }}>
-                <h3>Fulfillment Queue for {selectedUser.name}</h3>
+                <h3 style={{ borderBottom: '1px solid #444', paddingBottom: '10px' }}>Fulfillment Queue for {selectedUser.name}</h3>
                 {trackingOrders.length === 0 ? (
-                    <p>No transactions logged for this client profile location.</p>
+                    <p style={{ color: '#aaa', fontStyle: 'italic' }}>No transactions logged for this client profile location.</p>
                 ) : (
                     trackingOrders.map(order => {
-                        // 🚀 FIXED: Pull dynamic string names directly from the backend DTO property
                         const displayItemName = order.notes || 'Premium Reward Item';
 
                         return (
-                            <div key={order.id} style={{ border: '1px solid #444', padding: '15px', marginBottom: '10px' }}>
+                            <div key={order.id} style={{ border: '1px solid #444', padding: '15px', marginBottom: '10px', borderRadius: '6px', backgroundColor: '#2c2c2c' }}>
                                 <p><strong>Item:</strong> {displayItemName}</p>
-                                <p><strong>Status:</strong> {order.status}</p>
+                                <p><strong>Status:</strong> <span style={{ color: order.status === 'PENDING' ? '#ffc107' : '#3498db', fontWeight: 'bold' }}>{order.status}</span></p>
 
                                 {order.status === 'APPROVED' && (
                                     <div style={{ margin: '10px 0' }}>
@@ -76,13 +70,13 @@ const AdminDashboard = () => {
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                                     {order.status === 'PENDING' && (
-                                        <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={{ background: '#28a745', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer' }}>Approve</button>
+                                        <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={{ background: '#28a745', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>Approve</button>
                                     )}
                                     {order.status === 'APPROVED' && (
-                                        <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ background: '#3498db', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer' }}>Dispatch (Ship)</button>
+                                        <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ background: '#3498db', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>Dispatch (Ship)</button>
                                     )}
                                     {order.status === 'SHIPPED' && (
-                                        <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ background: '#28a745', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer' }}>Deliver</button>
+                                        <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ background: '#28a745', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>Deliver</button>
                                     )}
                                 </div>
                             </div>
@@ -94,29 +88,50 @@ const AdminDashboard = () => {
     };
 
     return (
-        <div style={{ padding: '30px', backgroundColor: '#111', minHeight: '90vh', color: '#fff' }}>
+        <div style={{ padding: '30px', backgroundColor: '#111', minHeight: '90vh', color: '#fff', fontFamily: 'Arial, sans-serif' }}>
             <h2>Admin Master Panel Operations</h2>
             {selectedUser ? (
                 <div>
-                    <button onClick={() => setSelectedUser(null)} style={{ padding: '6px 12px', marginBottom: '15px', cursor: 'pointer' }}>Back to Lists</button>
+                    <button onClick={() => setSelectedUser(null)} style={{ padding: '8px 16px', marginBottom: '15px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', fontWeight: 'bold' }}>Back to Lists</button>
                     {renderProfileTab()}
                 </div>
             ) : (
                 <div>
                     <h3>Active System Ledger Rows</h3>
-                    {wallets.map(w => (
-                        <div key={w.userId} style={{ padding: '10px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between' }}>
-                            <button onClick={() => setSelectedUser({ id: w.userId, name: w.fullName })} style={{ color: '#28a745', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', textDecoration: 'underline' }}>
-                                {w.fullName || 'User Profile Link'}
-                            </button>
-                            <span>{w.currentBalance != null ? w.currentBalance.toLocaleString() : 0} pts</span>
-                        </div>
-                    ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {wallets.map(w => {
+                            // 🚀 TARGETED NOTIFICATION CHECK: Evaluate if this user has active PENDING queues
+                            const hasPendingRequests = payouts.some(p => p.userId === w.userId && p.status === 'PENDING');
 
-                    <div style={{ marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} style={{ padding: '5px 10px' }}>Prev</button>
+                            return (
+                                <div key={w.userId} style={{ padding: '15px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                        <button
+                                            onClick={() => setSelectedUser({ id: w.userId, name: w.fullName })}
+                                            style={{ color: '#28a745', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px', textDecoration: 'underline', padding: 0 }}
+                                        >
+                                            {w.fullName || 'User Profile Link'}
+                                        </button>
+
+                                        {/* 🚀 DYNAMIC ADMINISTRATIVE NOTIFICATION BADGE CONTAINER */}
+                                        {hasPendingRequests && (
+                                            <span style={{ backgroundColor: '#dc3545', color: '#fff', fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', animate: 'pulse 2s infinite' }}>
+                                                ⚠️ PENDING APPROVAL
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span style={{ fontWeight: 'bold', color: '#28a745', fontSize: '15px' }}>
+                                        {w.currentBalance != null ? w.currentBalance.toLocaleString() : 0} pts
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div style={{ marginTop: '25px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} style={{ padding: '6px 12px', cursor: 'pointer' }}>Prev</button>
                         <span>Page {currentPage + 1} of {totalPages}</span>
-                        <button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage(p => p + 1)} style={{ padding: '5px 10px' }}>Next</button>
+                        <button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage(p => p + 1)} style={{ padding: '6px 12px', cursor: 'pointer' }}>Next</button>
                     </div>
                 </div>
             )}

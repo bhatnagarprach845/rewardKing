@@ -1,20 +1,14 @@
 package com.bhatn.rewardking.controller;
 
-import com.bhatn.rewardking.dto.PayoutStatusResponse;
-import com.bhatn.rewardking.entity.StoreItem;
-import com.bhatn.rewardking.entity.UserWallet;
 import com.bhatn.rewardking.service.RewardService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,14 +43,6 @@ public class RewardController {
         }
     }
 
-    /**
-     * 🚀 PAGINATED WALLETS LOOKUP FOR ADMIN PANEL
-     */
-    @GetMapping("/admin/wallets")
-    public ResponseEntity<?> getAdminWallets(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        Page<UserWallet> walletPage = rewardService.getPaginatedWallets(PageRequest.of(page, size));
-        return ResponseEntity.ok(walletPage);
-    }
 
     @PostMapping("/payouts/update-status/{transactionId}")
     public ResponseEntity<?> updateOrderStatus(

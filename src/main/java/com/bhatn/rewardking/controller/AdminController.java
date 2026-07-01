@@ -11,10 +11,12 @@ import com.bhatn.rewardking.repository.RewardTransactionRepository;
 import com.bhatn.rewardking.repository.UserRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page; // 🚀 FIXED: Swapped out Hibernate Page import
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*") // 🚀 FIXED: Allow Amplify routing hooks smoothly
 public class AdminController {
 
     private final WalletRepository walletRepository;
@@ -43,7 +46,6 @@ public class AdminController {
      */
     @GetMapping("/payouts")
     public List<PayoutDTO> getRedeemedHistory() {
-        // OPTIMIZATION: Switched to repository filtering to keep memory footprints safe
         List<RewardTransaction> redemptions = transactionRepository.findByType("REDEEMED");
 
         List<String> userIds = redemptions.stream().map(RewardTransaction::getUserId).distinct().toList();
@@ -121,21 +123,27 @@ public class AdminController {
 
     /**
      * Returns all user wallets enriched with metadata descriptors for admin panels.
+     * 🚀 PAGINATED SOLUTION INTERFACE
      */
     @GetMapping("/wallets")
-    public ResponseEntity<List<AdminWalletDTO>> getAdminWallets() {
-        List<UserWallet> wallets = walletRepository.findAll();
+    public ResponseEntity<Page<AdminWalletDTO>> getAdminWallets(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        List<String> userIds = wallets.stream().map(UserWallet::getUserId).distinct().toList();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserWallet> walletPage = walletRepository.findAll(pageable);
+
+        List<String> userIds = walletPage.getContent().stream()
+                .map(UserWallet::getUserId)
+                .distinct()
+                .toList();
+
         Map<String, User> userMap = userRepository.findAllById(userIds)
-                .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
+                .stream()
+                .collect(Collectors.toMap(User::getCognitoId, Function.identity()));
 
-        List<AdminWalletDTO> result = wallets.stream().map(wallet -> {
+        Page<AdminWalletDTO> resultPage = walletPage.map(wallet -> {
             User user = userMap.get(wallet.getUserId());
-
-            // FIX: If currentBalance requires a BigDecimal, we typecast it explicitly here.
-            // If your DTO has already been updated to a long primitive, you can change this back to wallet.getAvailablePoints()
-            BigDecimal balanceValue = BigDecimal.valueOf(wallet.getAvailablePoints());
 
             return AdminWalletDTO.builder()
                     .userId(wallet.getUserId())
@@ -144,9 +152,9 @@ public class AdminController {
                     .currentBalance(wallet.getAvailablePoints())
                     .lastUpdated(wallet.getLastUpdated())
                     .build();
-        }).toList();
+        });
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(resultPage);
     }
 
     @GetMapping("/users/{userId}/receipts")

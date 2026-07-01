@@ -50,7 +50,7 @@ public class RewardTransaction {
 
     // Inside com.bhatn.rewardking.entity.RewardTransaction.java
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "item_id", referencedColumnName = "itemId")
+    @JoinColumn(name = "item_id", referencedColumnName = "item_Id")
     private StoreItem storeItem;
 
     public enum TransactionStatus {

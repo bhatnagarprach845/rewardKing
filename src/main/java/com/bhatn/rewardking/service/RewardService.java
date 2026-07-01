@@ -37,6 +37,8 @@ public class RewardService {
         return storeItemRepository.findAll();
     }
 
+    // Update these two specific methods inside your RewardService.java
+
     @Transactional(readOnly = true)
     public PayoutStatusResponse getUserPointsDashboard(String userId) {
         UserWallet wallet = walletRepository.findByUserId(userId)
@@ -44,18 +46,21 @@ public class RewardService {
 
         List<RewardTransaction> transactions = transactionRepository.findTop10ByUserIdOrderByIdDesc(userId);
 
-        List<TransactionDTO> dtos = transactions.stream().map(tx ->
-                TransactionDTO.builder()
-                        .id(String.valueOf(tx.getId()))
-                        .amount(tx.getPointsAmount())
-                        .type(tx.getType())
-                        .date(tx.getProcessedAt() != null ? tx.getProcessedAt().toLocalDate().toString() : "")
-                        .processedAt(tx.getProcessedAt() != null ? tx.getProcessedAt().toString() : "")
-                        .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
-                        .notes(tx.getNotes())
-                        .trackingnumber(tx.getTrackingNumber())
-                        .build()
-        ).collect(Collectors.toList());
+        List<TransactionDTO> dtos = transactions.stream().map(tx -> {
+            // Fallback gracefully if it's an EARNED transaction with no physical item
+            String actualItemName = tx.getStoreItem() != null ? tx.getStoreItem().getName() : tx.getNotes();
+
+            return TransactionDTO.builder()
+                    .id(String.valueOf(tx.getId()))
+                    .amount(tx.getPointsAmount())
+                    .type(tx.getType())
+                    .date(tx.getProcessedAt() != null ? tx.getProcessedAt().toLocalDate().toString() : "")
+                    .processedAt(tx.getProcessedAt() != null ? tx.getProcessedAt().toString() : "")
+                    .status(tx.getStatus() != null ? tx.getStatus().name() : "PENDING")
+                    .notes(actualItemName) // 🚀 Send actual item name back inside the notes property wrapper
+                    .trackingNumber(tx.getTrackingNumber())
+                    .build();
+        }).collect(Collectors.toList());
 
         return PayoutStatusResponse.builder()
                 .name(wallet.getFullName())
@@ -66,14 +71,9 @@ public class RewardService {
                 .build();
     }
 
-    /**
-     * 🚀 TRANSACTION GUARANTEED WITH PESSIMISTIC LOCKING:
-     * Prevents race conditions and duplicate checkouts by locking the user's wallet row.
-     */
     @Transactional
     public void processBulkCartRedemption(String userId, List<RedeemPointsRequest.CartItemDTO> cartItems) {
-        // 🚀 CRITICAL SECURE UPDATE: Using findByUserIdForUpdate instead of standard read to guard points balance
-        UserWallet wallet = walletRepository.findByUserIdForUpdate(userId)
+        UserWallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user profile instance."));
 
         long totalCartCost = 0;
@@ -91,25 +91,23 @@ public class RewardService {
             throw new IllegalArgumentException("Insufficient points balance. Cart checkout blocked.");
         }
 
-        // Apply deductions atomically
         wallet.setAvailablePoints(wallet.getAvailablePoints() - totalCartCost);
         walletRepository.save(wallet);
 
         for (RedeemPointsRequest.CartItemDTO item : cartItems) {
             StoreItem storeItem = storeItemRepository.findById(item.getItemId()).get();
 
-            // Decrement Stock Level
             storeItem.setStockLevel(storeItem.getStockLevel() - item.getQuantity());
             storeItemRepository.save(storeItem);
 
-            // Record fulfillment request row
             RewardTransaction debitTransaction = RewardTransaction.builder()
                     .userId(userId)
                     .pointsAmount(storeItem.getPointsCost() * item.getQuantity())
                     .type("REDEEMED")
                     .status(TransactionStatus.PENDING)
                     .processedAt(LocalDateTime.now())
-                    .notes("Order Placement: " + item.getItemId())
+                    .storeItem(storeItem) // 🚀 CRITICAL: Link the actual database entity item here!
+                    .notes(storeItem.getName())
                     .build();
 
             transactionRepository.save(debitTransaction);

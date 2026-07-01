@@ -48,6 +48,11 @@ public class RewardTransaction {
     @Column(name = "tracking_number")
     private String trackingNumber;
 
+    // Inside com.bhatn.rewardking.entity.RewardTransaction.java
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", referencedColumnName = "itemId")
+    private StoreItem storeItem;
+
     public enum TransactionStatus {
         PENDING,
         COMPLETED,

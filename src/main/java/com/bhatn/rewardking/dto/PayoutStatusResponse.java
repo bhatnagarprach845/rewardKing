@@ -27,6 +27,6 @@ public class PayoutStatusResponse {
         private String processedAt;   // 🚀 Added: Full ISO date string for user activity layout grids
         private String status;        // "COMPLETED" or "PENDING"
         private String notes;         // 🚀 Added: Stores the merchandise description details
-        private String trackingnumber;         // 🚀 Added: Stores the merchandise description details
+        private String trackingNumber;         // 🚀 Added: Stores the merchandise description details
     }
 }

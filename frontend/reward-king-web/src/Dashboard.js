@@ -21,7 +21,8 @@ const Dashboard = ({ refreshTrigger, username }) => {
 
     const currentPoints = data.currentBalance !== undefined ? data.currentBalance : (data.availablePoints || 0);
     const dynamicMilestoneTarget = 1500;
-    const progressPercent = Math.min((currentPoints / dynamicMilestoneTarget) * 100, 100);
+    // 🚀 UX FIX: Guards against out-of-bounds metrics if balance is zero or modifying
+    const progressPercent = Math.max(0, Math.min((currentPoints / dynamicMilestoneTarget) * 100, 100));
 
     const allRedeemed = (data.recentTransactions || []).filter(tx => tx.type === 'REDEEMED');
     const activeOrders = allRedeemed.filter(tx => tx.status !== 'DELIVERED');

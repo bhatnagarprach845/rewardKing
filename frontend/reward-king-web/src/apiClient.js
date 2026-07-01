@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
+// Extract the raw domain from your environment variables
+let hostUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+
+// Strip any accidental trailing slashes or duplicate api/v1 segments to keep the root clean
+hostUrl = hostUrl.replace(/\/$/, '').replace(/\/api\/v1$/, '');
+
 const apiClient = axios.create({
-    baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1',
+    // 🚀 THE FIX: Enforce the base URL path to always append /api/v1 globally!
+    baseURL: `${hostUrl}/api/v1`,
     headers: { 'Content-Type': 'application/json' }
 });
 

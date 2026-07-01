@@ -10,8 +10,9 @@ import com.bhatn.rewardking.repository.ReceiptRepository;
 import com.bhatn.rewardking.repository.RewardTransactionRepository;
 import com.bhatn.rewardking.repository.UserRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
+import com.bhatn.rewardking.service.RewardService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page; // 🚀 FIXED: Swapped out Hibernate Page import
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -25,25 +26,20 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*") // 🚀 FIXED: Allow Amplify routing hooks smoothly
+@CrossOrigin(origins = "*")
 public class AdminController {
 
     private final WalletRepository walletRepository;
     private final UserRepository userRepository;
     private final ReceiptRepository receiptRepository;
     private final RewardTransactionRepository transactionRepository;
+    private final RewardService rewardService;
 
-    /**
-     * Fetch all historical transactions logged in the ecosystem.
-     */
     @GetMapping("/transactions")
     public List<RewardTransaction> getAllTransactions() {
         return transactionRepository.findAll();
     }
 
-    /**
-     * Returns points redemption history logs for administrative dashboard views.
-     */
     @GetMapping("/payouts")
     public List<PayoutDTO> getRedeemedHistory() {
         List<RewardTransaction> redemptions = transactionRepository.findByType("REDEEMED");
@@ -65,66 +61,19 @@ public class AdminController {
         }).toList();
     }
 
-    /**
-     * Exports a clean CSV compilation of catalog item redemptions.
-     */
-    @GetMapping("/payouts/report")
-    public ResponseEntity<String> exportPayoutsCsv() {
-        List<RewardTransaction> redemptions = transactionRepository.findByType("REDEEMED");
-
-        List<String> userIds = redemptions.stream().map(RewardTransaction::getUserId).distinct().toList();
-        Map<String, User> userMap = userRepository.findAllById(userIds)
-                .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
-
-        StringBuilder csv = new StringBuilder();
-        csv.append("User Name,Points Redeemed,Item Details,Processed Date\n");
-
-        for (RewardTransaction tx : redemptions) {
-            User user = userMap.get(tx.getUserId());
-            csv.append(user != null ? user.getName() : "Unknown User").append(",")
-                    .append(tx.getPointsAmount()).append(",")
-                    .append(tx.getNotes() != null ? tx.getNotes().replace(",", ";") : "N/A").append(",")
-                    .append(tx.getProcessedAt()).append("\n");
+    @PostMapping("/payouts/update-status/{transactionId}")
+    public ResponseEntity<?> updateOrderStatus(
+            @PathVariable Long transactionId,
+            @RequestParam String newStatus,
+            @RequestParam(required = false) String trackingNumber) {
+        try {
+            rewardService.updateOrderStatusWithTracking(transactionId, newStatus, trackingNumber);
+            return ResponseEntity.ok(Map.of("status", "SUCCESS"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-
-        return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=points_redemption_history.csv")
-                .header("Content-Type", "text/csv")
-                .body(csv.toString());
     }
 
-    /**
-     * Exports a CSV of user wallets tracking point values.
-     */
-    @GetMapping("/wallets/export")
-    public ResponseEntity<String> exportWalletsCsv() {
-        List<UserWallet> wallets = walletRepository.findAll();
-
-        List<String> userIds = wallets.stream().map(UserWallet::getUserId).distinct().toList();
-        Map<String, User> userMap = userRepository.findAllById(userIds)
-                .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
-
-        StringBuilder csv = new StringBuilder();
-        csv.append("User ID,Email,Available Points,Last Updated\n");
-
-        for (UserWallet wallet : wallets) {
-            User user = userMap.get(wallet.getUserId());
-            csv.append(wallet.getUserId()).append(",")
-                    .append(user != null ? user.getEmail() : "N/A").append(",")
-                    .append(wallet.getAvailablePoints()).append(",")
-                    .append(wallet.getLastUpdated()).append("\n");
-        }
-
-        return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=user_points_report.csv")
-                .header("Content-Type", "text/csv")
-                .body(csv.toString());
-    }
-
-    /**
-     * Returns all user wallets enriched with metadata descriptors for admin panels.
-     * 🚀 PAGINATED SOLUTION INTERFACE
-     */
     @GetMapping("/wallets")
     public ResponseEntity<Page<AdminWalletDTO>> getAdminWallets(
             @RequestParam(defaultValue = "0") int page,
@@ -155,6 +104,56 @@ public class AdminController {
         });
 
         return ResponseEntity.ok(resultPage);
+    }
+
+    @GetMapping("/payouts/report")
+    public ResponseEntity<String> exportPayoutsCsv() {
+        List<RewardTransaction> redemptions = transactionRepository.findByType("REDEEMED");
+
+        List<String> userIds = redemptions.stream().map(RewardTransaction::getUserId).distinct().toList();
+        Map<String, User> userMap = userRepository.findAllById(userIds)
+                .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("User Name,Points Redeemed,Item Details,Processed Date\n");
+
+        for (RewardTransaction tx : redemptions) {
+            User user = userMap.get(tx.getUserId());
+            csv.append(user != null ? user.getName() : "Unknown User").append(",")
+                    .append(tx.getPointsAmount()).append(",")
+                    .append(tx.getNotes() != null ? tx.getNotes().replace(",", ";") : "N/A").append(",")
+                    .append(tx.getProcessedAt()).append("\n");
+        }
+
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=points_redemption_history.csv")
+                .header("Content-Type", "text/csv")
+                .body(csv.toString());
+    }
+
+    @GetMapping("/wallets/export")
+    public ResponseEntity<String> exportWalletsCsv() {
+        List<UserWallet> wallets = walletRepository.findAll();
+
+        List<String> userIds = wallets.stream().map(UserWallet::getUserId).distinct().toList();
+        Map<String, User> userMap = userRepository.findAllById(userIds)
+                .stream().collect(Collectors.toMap(User::getCognitoId, Function.identity()));
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("User ID,Email,Available Points,Last Updated\n");
+
+        for (UserWallet wallet : wallets) {
+            User user = userMap.get(wallet.getUserId());
+            csv.append(wallet.getUserId()).append(",")
+                    .append(user != null ? user.getEmail() : "N/A").append(",")
+                    .append(wallet.getAvailablePoints()).append(",")
+                    .append(wallet.getLastUpdated()).append("\n");
+        }
+
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=user_points_report.csv")
+                .header("Content-Type", "text/csv")
+                .body(csv.toString());
     }
 
     @GetMapping("/users/{userId}/receipts")

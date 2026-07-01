@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchAuthSession } from 'aws-amplify/auth';
-import axios from 'axios';
-
-const HOST = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-const BASE_URL = `${HOST}/api/v1/users/profile`;
+import apiClient from './apiClient';
 
 const UserProfile = () => {
     const [profile, setProfile] = useState({ name: '', email: '', address: '', phoneNumber: '', upiId: '' });
@@ -11,47 +7,31 @@ const UserProfile = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
-    const fetchProfileData = async () => {
-        try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
-            if (!token) return;
-
-            const res = await axios.get(BASE_URL, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            let responseData = res.data;
-            if (typeof responseData.body === 'string') {
-                responseData = JSON.parse(responseData.body);
+    useEffect(() => {
+        const fetchProfileData = async () => {
+            try {
+                // 🚀 FIXED PATH: Correct user namespace routing target location
+                const res = await apiClient.get('/users/profile');
+                setProfile({
+                    name: res.data.name || '',
+                    email: res.data.email || '',
+                    address: res.data.address || '',
+                    phoneNumber: res.data.phoneNumber || '',
+                    upiId: res.data.upiId || ''
+                });
+            } catch (err) {
+                console.error("Failed to load user info card parameters:", err);
+            } finally {
+                setIsLoading(false);
             }
-
-            setProfile({
-                name: responseData.name || '',
-                email: responseData.email || '',
-                address: responseData.address || '',
-                phoneNumber: responseData.phoneNumber || '',
-                upiId: responseData.upiId || ''
-            });
-        } catch (err) {
-            console.error("Failed to load user info card parameters:", err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => { fetchProfileData(); }, []);
+        };
+        fetchProfileData();
+    }, []);
 
     const handleSave = async (e) => {
         e.preventDefault();
-
-    // 🚀 PHONE NUMBER VALIDATION CHECKS
-    // Strips spaces, dashes, or parentheses to evaluate pure digits
-    const cleanPhone = profile.phoneNumber.replace(/[\s\-()]/g, '');
-
-    // Regex patterns:
-    // Ensures the number is between 10 and 13 digits (accommodating optional country codes)
-    const phoneRegex = /^[0-9]{10,13}$/;
+        const cleanPhone = profile.phoneNumber.replace(/[\s\-()]/g, '');
+        const phoneRegex = /^[0-9]{10,13}$/;
 
     if (!profile.phoneNumber.trim()) {
         alert("⚠️ Phone number cannot be left empty. It is required for delivery coordination.");
@@ -64,13 +44,7 @@ const UserProfile = () => {
     }
         setIsSaving(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
-
-            await axios.post(`${BASE_URL}/update`, profile, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-            });
-
+            await apiClient.post('/users/profile/update', profile);
             alert("🎉 Profile records updated successfully!");
             setIsEditing(false);
         } catch (err) {
@@ -120,18 +94,6 @@ const UserProfile = () => {
                         />
                     </div>
 
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>💳 UPI Identifier (Optional)</label>
-                        <input
-                            type="text"
-                            value={profile.upiId}
-                            disabled={!isEditing}
-                            placeholder="username@bankline"
-                            onChange={(e) => setProfile({ ...profile, upiId: e.target.value })}
-                            style={{ ...styles.input, backgroundColor: isEditing ? '#fff' : '#f5f5f5' }}
-                        />
-                    </div>
-
                     {isEditing ? (
                         <div style={{ display: 'flex', gap: '10px', marginTop: '25px' }}>
                             <button type="button" onClick={() => setIsEditing(false)} style={styles.cancelBtn}>Cancel</button>
@@ -160,7 +122,7 @@ const styles = {
     userEmail: { fontSize: '14px', color: '#666', margin: '0 0 20px 0' },
     inputGroup: { display: 'flex', flexDirection: 'column', textAlign: 'left', marginBottom: '16px' },
     label: { fontSize: '12px', fontWeight: 'bold', color: '#555', marginBottom: '6px', textTransform: 'uppercase' },
-    input: { padding: '10px 14px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '14px', color: '#333', outline: 'none', transition: 'border 0.2s' },
+    input: { padding: '10px 14px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '14px', color: '#333', outline: 'none' },
     textarea: { padding: '10px 14px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '14px', color: '#333', outline: 'none', resize: 'none', fontFamily: 'inherit' },
     editBtn: { width: '100%', marginTop: '15px', backgroundColor: '#28a745', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' },
     saveBtn: { flex: 2, backgroundColor: '#007bff', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' },

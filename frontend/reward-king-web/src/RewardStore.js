@@ -13,9 +13,9 @@ const RewardStore = () => {
         const loadInitialStoreContext = async () => {
             try {
                 const [walletRes, catalogRes, profileRes] = await Promise.all([
-                    apiClient.get('api/v1/payout-status'),
-                    apiClient.get('api/v1/store/items'),
-                    apiClient.get('api/v1/users/profile')
+                    apiClient.get('/payout-status'),
+                    apiClient.get('/store/items'),
+                    apiClient.get('/users/profile')
                 ]);
 
                 setUserPoints(walletRes.data.currentBalance || walletRes.data.availablePoints || 0);
@@ -72,14 +72,13 @@ const RewardStore = () => {
 
         try {
             const itemsPayload = cart.map(i => ({ itemId: i.itemId, quantity: i.quantity, pointsCost: i.pointsCost }));
-            await apiClient.post('api/v1/redeem-points', { items: itemsPayload });
+            await apiClient.post('/redeem-points', { items: itemsPayload });
 
             alert("🎉 Basket verified! Your items have shifted to active fulfillment tracking pipelines.");
             setUserPoints(prev => prev - totalCost);
             setCart([]);
 
-            // Reload catalog to refresh stock allocations
-            const freshCatalog = await apiClient.get('api/v1/store/items');
+            const freshCatalog = await apiClient.get('/store/items');
             setCatalog(freshCatalog.data);
         } catch (e) {
             alert("Checkout processing transaction failed.");
@@ -88,7 +87,7 @@ const RewardStore = () => {
         }
     };
 
-    if (isLoading) return <p style={{ color: 'white', textAlign: 'center' }}>Syncing parameters...</p>;
+    if (isLoading) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Syncing parameters...</p>;
 
     return (
         <div style={styles.container}>
@@ -157,11 +156,11 @@ const styles = {
     container: { padding: '30px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'Arial, sans-serif' },
     headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', backgroundColor: '#f8f9fa', padding: '15px 20px', borderRadius: '12px' },
     backBtn: { padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
-    pointsDisplay: { fontSize: '16px' },
+    pointsDisplay: { fontSize: '16px', color: '#333' },
     alertBanner: { backgroundColor: '#dc3545', color: 'white', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' },
     mainLayout: { display: 'flex', gap: '30px', flexWrap: 'wrap' },
     catalogSide: { flex: '3 1 600px', color: '#fff' },
-    cartSide: { flex: '1 1 320px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '20px' },
+    cartSide: { flex: '1 1 320px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '20px', color: '#333' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' },
     catalogCard: { backgroundColor: '#fff', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', color: '#333' },
     itemImage: { fontSize: '40px', textAlign: 'center' },

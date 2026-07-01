@@ -16,7 +16,9 @@ public interface WalletRepository extends JpaRepository<UserWallet, String> {
     // 1. Used for the Dashboard (No Transaction/Lock overhead required)
     Optional<UserWallet> findByUserId(String userId);
 
-    // 2. Used for points modifications to prevent double-spending concurrency bugs
+    /**
+     * 🚀 PESSIMISTIC LOCK: Locks the row (SELECT ... FOR UPDATE) during checkouts
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM UserWallet w WHERE w.userId = :userId")
     Optional<UserWallet> findByUserIdForUpdate(String userId);

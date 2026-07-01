@@ -43,7 +43,7 @@ public class RewardController {
         }
     }
 
-
+/*
     @PostMapping("/payouts/update-status/{transactionId}")
     public ResponseEntity<?> updateOrderStatus(
             @AuthenticationPrincipal Jwt jwt,
@@ -58,7 +58,7 @@ public class RewardController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-    }
+    }*/
 
     @GetMapping("/payout-status")
     public ResponseEntity<?> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {

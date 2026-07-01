@@ -5,7 +5,6 @@ const AdminDashboard = () => {
     const [wallets, setWallets] = useState([]);
     const [payouts, setPayouts] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
-    const [viewMode, setViewMode] = useState('list');
     const [trackingInput, setTrackingInput] = useState('');
 
     // Pagination configurations metadata states
@@ -14,10 +13,10 @@ const AdminDashboard = () => {
 
     const fetchInitialData = useCallback(async () => {
         try {
-            // 🚀 PAGINATED REQUEST ROUTED FOR LOAD BALANCE PROTECTION
+            // 🚀 FIXED PATHS: Clean api paths configured through global apiClient instance cleanly
             const [walletRes, payoutRes] = await Promise.all([
-                apiClient.get(`api/v1//admin/wallets?page=${currentPage}&size=10`),
-                apiClient.get('api/v1/admin/payouts')
+                apiClient.get(`/admin/wallets?page=${currentPage}&size=10`),
+                apiClient.get('/admin/payouts')
             ]);
 
             setWallets(walletRes.data.content || []);
@@ -32,8 +31,8 @@ const AdminDashboard = () => {
 
     const handleUpdateStatus = async (transactionId, newStatus) => {
         try {
-            // 🚀 PASS TRACKING CODES FOR LOGISTICS UPDATES DYNAMICALLY
-            await apiClient.post(`api/v1//payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
+            // 🚀 TARGETED ADMIN NAMESPACE FOR ORDER life-cycle UPDATES
+            await apiClient.post(`/admin/payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
             alert("Order updated successfully!");
             setTrackingInput('');
             fetchInitialData();
@@ -54,7 +53,6 @@ const AdminDashboard = () => {
                         <p><strong>Item:</strong> {order.notes}</p>
                         <p><strong>Status:</strong> {order.status}</p>
 
-                        {/* 🚀 FORM ENTRY: Attach logistics URLs dynamically before moving statuses */}
                         {order.status === 'APPROVED' && (
                             <div style={{ margin: '10px 0' }}>
                                 <label style={{ fontSize: '11px', display: 'block' }}>Carrier Tracking Link:</label>
@@ -63,20 +61,20 @@ const AdminDashboard = () => {
                                     placeholder="https://tracking.delhivery.com/..."
                                     value={trackingInput}
                                     onChange={(e) => setTrackingInput(e.target.value)}
-                                    style={{ width: '90%', padding: '6px', borderRadius: '4px', border: '1px solid #555' }}
+                                    style={{ width: '90%', padding: '6px', borderRadius: '4px', border: '1px solid #555', color: '#000' }}
                                 />
                             </div>
                         )}
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             {order.status === 'PENDING' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={{ background: '#28a745', color: '#fff', padding: '5px' }}>Approve</button>
+                                <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={{ background: '#28a745', color: '#fff', padding: '5px', border: 'none', cursor: 'pointer' }}>Approve</button>
                             )}
                             {order.status === 'APPROVED' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ background: '#3498db', color: '#fff', padding: '5px' }}>Dispatch (Ship)</button>
+                                <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ background: '#3498db', color: '#fff', padding: '5px', border: 'none', cursor: 'pointer' }}>Dispatch (Ship)</button>
                             )}
                             {order.status === 'SHIPPED' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ background: '#28a745', color: '#fff', padding: '5px' }}>Deliver</button>
+                                <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ background: '#28a745', color: '#fff', padding: '5px', border: 'none', cursor: 'pointer' }}>Deliver</button>
                             )}
                         </div>
                     </div>
@@ -90,7 +88,7 @@ const AdminDashboard = () => {
             <h2>Admin Master Panel Operations</h2>
             {selectedUser ? (
                 <div>
-                    <button onClick={() => setSelectedUser(null)}>Back to Lists</button>
+                    <button onClick={() => setSelectedUser(null)} style={{ padding: '6px 12px', marginBottom: '15px', cursor: 'pointer' }}>Back to Lists</button>
                     {renderProfileTab()}
                 </div>
             ) : (
@@ -98,18 +96,17 @@ const AdminDashboard = () => {
                     <h3>Active System Ledger Rows</h3>
                     {wallets.map(w => (
                         <div key={w.userId} style={{ padding: '10px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between' }}>
-                            <button onClick={() => setSelectedUser({ id: w.userId, name: w.fullName })} style={{ color: '#28a745', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                            <button onClick={() => setSelectedUser({ id: w.userId, name: w.fullName })} style={{ color: '#28a745', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', textDecoration: 'underline' }}>
                                 {w.fullName || 'User Profile Link'}
                             </button>
                             <span>{w.availablePoints} pts</span>
                         </div>
                     ))}
 
-                    {/* Pagination Nav Footer UI Controls */}
-                    <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                        <button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)}>Prev</button>
+                    <div style={{ marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} style={{ padding: '5px 10px' }}>Prev</button>
                         <span>Page {currentPage + 1} of {totalPages}</span>
-                        <button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage(p => p + 1)}>Next</button>
+                        <button disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage(p => p + 1)} style={{ padding: '5px 10px' }}>Next</button>
                     </div>
                 </div>
             )}

@@ -8,7 +8,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const res = await apiClient.get('/api/v1/payout-status');
+                const res = await apiClient.get('/payout-status');
                 setData(res.data);
             } catch (err) {
                 console.error("Failed to load dashboard balances:", err);
@@ -17,15 +17,12 @@ const Dashboard = ({ refreshTrigger, username }) => {
         fetchDashboardData();
     }, [refreshTrigger]);
 
-    if (!data) return <p style={{ color: 'white', textAlign: 'center' }}>Loading your dashboard...</p>;
+    if (!data) return <p style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>Loading your dashboard...</p>;
 
     const currentPoints = data.currentBalance !== undefined ? data.currentBalance : (data.availablePoints || 0);
-
-    // 🚀 UX DYNAMIC MILESTONE EXT指标: Set target to 1.5x milestone baseline thresholds
     const dynamicMilestoneTarget = 1500;
     const progressPercent = Math.min((currentPoints / dynamicMilestoneTarget) * 100, 100);
 
-    // Filter sub-arrays based on fulfillment status tabs
     const allRedeemed = (data.recentTransactions || []).filter(tx => tx.type === 'REDEEMED');
     const activeOrders = allRedeemed.filter(tx => tx.status !== 'DELIVERED');
     const historicOrders = allRedeemed.filter(tx => tx.status === 'DELIVERED');

@@ -31,54 +31,70 @@ const AdminDashboard = () => {
 
     const handleUpdateStatus = async (transactionId, newStatus) => {
         try {
-            // 🚀 TARGETED ADMIN NAMESPACE FOR ORDER life-cycle UPDATES
             await apiClient.post(`/admin/payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
-            alert("Order updated successfully!");
+            alert("Order status adjusted successfully!");
             setTrackingInput('');
-            fetchInitialData();
-            if (selectedUser) setSelectedUser(null);
+
+            // 🚀 FIX 4: Refetch the latest data, but DO NOT call setSelectedUser(null).
+            // This leaves the administrator on the current user's profile view!
+            await fetchInitialData();
         } catch (e) {
             alert("Failed to modify tracking configuration parameter mappings.");
         }
     };
 
     const renderProfileTab = () => {
-        const trackingOrders = payouts.filter(p => p.userId === selectedUser.id && p.status !== 'DELIVERED');
+        // Filter out items matching this user
+        const trackingOrders = payouts.filter(p => p.userId === selectedUser.id);
 
         return (
             <div style={{ backgroundColor: '#222', padding: '20px', borderRadius: '8px', color: '#fff' }}>
-                <h3>Fulfillment Queue for User</h3>
-                {trackingOrders.map(order => (
-                    <div key={order.id} style={{ border: '1px solid #444', padding: '15px', marginBottom: '10px' }}>
-                        <p><strong>Item:</strong> {order.notes}</p>
-                        <p><strong>Status:</strong> {order.status}</p>
+                <h3>Fulfillment Queue for {selectedUser.name}</h3>
+                {trackingOrders.length === 0 ? (
+                    <p>No transactions logged for this client profile location.</p>
+                ) : (
+                    trackingOrders.map(order => {
+                        // Extract the base item string (e.g., "item_02") from "Order Placement: item_02"
+                        const parsedId = order.notes
+                            ? order.notes.replace('Order Placement: ', '').trim()
+                            : 'Unknown';
 
-                        {order.status === 'APPROVED' && (
-                            <div style={{ margin: '10px 0' }}>
-                                <label style={{ fontSize: '11px', display: 'block' }}>Carrier Tracking Link:</label>
-                                <input
-                                    type="text"
-                                    placeholder="https://tracking.delhivery.com/..."
-                                    value={trackingInput}
-                                    onChange={(e) => setTrackingInput(e.target.value)}
-                                    style={{ width: '90%', padding: '6px', borderRadius: '4px', border: '1px solid #555', color: '#000' }}
-                                />
+                        const displayItemName = ITEM_NAME_LOOKUP[parsedId] || parsedId;
+
+                        return (
+                            <div key={order.id} style={{ border: '1px solid #444', padding: '15px', marginBottom: '10px' }}>
+                                {/* 🚀 FIX 1: Display clean, mapped item descriptors */}
+                                <p><strong>Item:</strong> {displayItemName}</p>
+                                <p><strong>Status:</strong> {order.status}</p>
+
+                                {order.status === 'APPROVED' && (
+                                    <div style={{ margin: '10px 0' }}>
+                                        <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>Carrier Tracking Link:</label>
+                                        <input
+                                            type="text"
+                                            placeholder="https://tracking.delhivery.com/..."
+                                            value={trackingInput}
+                                            onChange={(e) => setTrackingInput(e.target.value)}
+                                            style={{ width: '90%', padding: '6px', borderRadius: '4px', border: '1px solid #555', color: '#000' }}
+                                        />
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    {order.status === 'PENDING' && (
+                                        <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={{ background: '#28a745', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer' }}>Approve</button>
+                                    )}
+                                    {order.status === 'APPROVED' && (
+                                        <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ background: '#3498db', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer' }}>Dispatch (Ship)</button>
+                                    )}
+                                    {order.status === 'SHIPPED' && (
+                                        <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ background: '#28a745', color: '#fff', padding: '6px 12px', border: 'none', cursor: 'pointer' }}>Deliver</button>
+                                    )}
+                                </div>
                             </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                            {order.status === 'PENDING' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'APPROVED')} style={{ background: '#28a745', color: '#fff', padding: '5px', border: 'none', cursor: 'pointer' }}>Approve</button>
-                            )}
-                            {order.status === 'APPROVED' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'SHIPPED')} style={{ background: '#3498db', color: '#fff', padding: '5px', border: 'none', cursor: 'pointer' }}>Dispatch (Ship)</button>
-                            )}
-                            {order.status === 'SHIPPED' && (
-                                <button onClick={() => handleUpdateStatus(order.id, 'DELIVERED')} style={{ background: '#28a745', color: '#fff', padding: '5px', border: 'none', cursor: 'pointer' }}>Deliver</button>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                        );
+                    })
+                )}
             </div>
         );
     };
@@ -99,7 +115,8 @@ const AdminDashboard = () => {
                             <button onClick={() => setSelectedUser({ id: w.userId, name: w.fullName })} style={{ color: '#28a745', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', textDecoration: 'underline' }}>
                                 {w.fullName || 'User Profile Link'}
                             </button>
-                            <span>{w.availablePoints} pts</span>
+                            {/* 🚀 FIX 2: Swap w.availablePoints to w.currentBalance to display points on screen */}
+                            <span>{w.currentBalance != null ? w.currentBalance.toLocaleString() : 0} pts</span>
                         </div>
                     ))}
 

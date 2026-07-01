@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from './apiClient';
 
+const ITEM_NAME_LOOKUP = {
+    'item_01': 'Premium Coffee Mug',
+    'item_02': 'Wireless Charging Pad',
+    'item_03': 'Premium Tech Backpack',
+    'item_04': 'Noise Cancelling Earbuds'
+};
+
 const Dashboard = ({ refreshTrigger, username }) => {
     const [data, setData] = useState(null);
-    const [activeFulfillmentTab, setActiveFulfillmentTab] = useState('ACTIVE'); // ACTIVE or HISTORY
+    const [activeFulfillmentTab, setActiveFulfillmentTab] = useState('ACTIVE');
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -68,24 +75,30 @@ const Dashboard = ({ refreshTrigger, username }) => {
                     {(activeFulfillmentTab === 'ACTIVE' ? activeOrders : historicOrders).length === 0 ? (
                         <p style={{ fontSize: '12px', color: '#888', textAlign: 'center', margin: '10px 0' }}>No orders listed in this archive folder.</p>
                     ) : (
-                        (activeFulfillmentTab === 'ACTIVE' ? activeOrders : historicOrders).map(tx => (
-                            <div key={tx.id} style={styles.txRow}>
-                                <div style={{ textAlign: 'left' }}>
-                                    <strong>Order ID: #{tx.id}</strong>
-                                    <div style={{ fontSize: '12px', color: '#555' }}>{tx.notes}</div>
-                                    {tx.trackingNumber && (
-                                        <div style={{ marginTop: '5px', fontSize: '11px' }}>
-                                            Link: <a href={tx.trackingNumber} target="_blank" rel="noreferrer" style={{ color: '#007bff', fontWeight: 'bold' }}>
-                                                Track Package 🚚
-                                            </a>
-                                        </div>
-                                    )}
+                        (activeFulfillmentTab === 'ACTIVE' ? activeOrders : historicOrders).map(tx => {
+                            const parsedId = tx.notes ? tx.notes.replace('Order Placement: ', '').trim() : '';
+                            const readableName = ITEM_NAME_LOOKUP[parsedId] || tx.notes;
+
+                            return (
+                                <div key={tx.id} style={styles.txRow}>
+                                    <div style={{ textAlign: 'left' }}>
+                                        <strong>Order ID: #{tx.id}</strong>
+                                        <div style={{ fontSize: '12px', color: '#555' }}>{readableName}</div>
+                                        {/* 🚀 FIX 3: Read tx.trackingNumber (matching the backend structure) to expose links to users */}
+                                        {tx.trackingnumber && (
+                                            <div style={{ marginTop: '5px', fontSize: '11px' }}>
+                                                Link: <a href={tx.trackingnumber} target="_blank" rel="noreferrer" style={{ color: '#007bff', fontWeight: 'bold' }}>
+                                                    Track Package 🚚
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div style={{ textTransform: 'uppercase', fontSize: '12px', color: '#f39c12', fontWeight: 'bold' }}>
+                                        {tx.status}
+                                    </div>
                                 </div>
-                                <div style={{ textTransform: 'uppercase', fontSize: '12px', color: '#f39c12', fontWeight: 'bold' }}>
-                                    {tx.status}
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
@@ -101,6 +114,8 @@ const Dashboard = ({ refreshTrigger, username }) => {
                             {allTransactions.map((tx) => {
                                 const isCredit = tx.type === 'EARNED' || tx.type === 'CREDIT';
                                 const rawAmount = tx.amount !== undefined ? tx.amount : (tx.pointsAmount !== undefined ? tx.pointsAmount : 0);
+                                const parsedId = tx.notes ? tx.notes.replace('Order Placement: ', '').trim() : '';
+                                const ledgerItemName = ITEM_NAME_LOOKUP[parsedId] || tx.notes || (isCredit ? 'Receipt Allocation' : 'Store Checkout');
 
                                 return (
                                     <div key={tx.id || Math.random()} style={styles.ledgerRow}>
@@ -113,7 +128,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
                                                 {tx.type}
                                             </span>
                                             <div style={{ fontSize: '12px', color: '#333', fontWeight: 'bold', marginTop: '6px' }}>
-                                                {tx.notes || (isCredit ? 'Receipt Scanning Allocation' : 'Store Reward Checkout')}
+                                                {ledgerItemName}
                                             </div>
                                             <div style={{ fontSize: '11px', color: '#888', marginTop: '3px' }}>
                                                 {tx.date || 'Recent Transaction'}

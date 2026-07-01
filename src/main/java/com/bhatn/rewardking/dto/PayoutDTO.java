@@ -16,4 +16,5 @@ public class PayoutDTO {
 
     private LocalDateTime processedAt;
     private String status;
+    private String notes;
 }

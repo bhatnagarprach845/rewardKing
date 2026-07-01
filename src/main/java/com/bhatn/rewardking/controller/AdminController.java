@@ -57,6 +57,7 @@ public class AdminController {
                     .amountAwarded(tx.getPointsAmount())
                     .processedAt(tx.getProcessedAt())
                     .status(tx.getStatus() != null ? tx.getStatus().name() : "COMPLETED")
+                    .notes(tx.getNotes()) // 🚀 FIX 1: Map notes so the frontend has item descriptions!
                     .build();
         }).toList();
     }

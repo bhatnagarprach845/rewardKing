@@ -35,8 +35,7 @@ const AdminDashboard = () => {
             alert("Order status adjusted successfully!");
             setTrackingInput('');
 
-            // 🚀 FIX 4: Refetch the latest data, but DO NOT call setSelectedUser(null).
-            // This leaves the administrator on the current user's profile view!
+            // 🚀 FIX: Refetch latest data without bumping user back to list screen
             await fetchInitialData();
         } catch (e) {
             alert("Failed to modify tracking configuration parameter mappings.");
@@ -54,16 +53,11 @@ const AdminDashboard = () => {
                     <p>No transactions logged for this client profile location.</p>
                 ) : (
                     trackingOrders.map(order => {
-                        // Extract the base item string (e.g., "item_02") from "Order Placement: item_02"
-                        const parsedId = order.notes
-                            ? order.notes.replace('Order Placement: ', '').trim()
-                            : 'Unknown';
-
-                        const displayItemName = ITEM_NAME_LOOKUP[parsedId] || parsedId;
+                        // 🚀 FIXED: Pull dynamic string names directly from the backend DTO property
+                        const displayItemName = order.notes || 'Premium Reward Item';
 
                         return (
                             <div key={order.id} style={{ border: '1px solid #444', padding: '15px', marginBottom: '10px' }}>
-                                {/* 🚀 FIX 1: Display clean, mapped item descriptors */}
                                 <p><strong>Item:</strong> {displayItemName}</p>
                                 <p><strong>Status:</strong> {order.status}</p>
 
@@ -115,7 +109,6 @@ const AdminDashboard = () => {
                             <button onClick={() => setSelectedUser({ id: w.userId, name: w.fullName })} style={{ color: '#28a745', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', textDecoration: 'underline' }}>
                                 {w.fullName || 'User Profile Link'}
                             </button>
-                            {/* 🚀 FIX 2: Swap w.availablePoints to w.currentBalance to display points on screen */}
                             <span>{w.currentBalance != null ? w.currentBalance.toLocaleString() : 0} pts</span>
                         </div>
                     ))}

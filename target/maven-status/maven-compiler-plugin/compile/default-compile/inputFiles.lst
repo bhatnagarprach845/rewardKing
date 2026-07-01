@@ -2,10 +2,12 @@ C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\entity
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\ExtractionResult.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\PayoutDTO.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\service\ocr\BillAnalyzer.java
+C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\repository\StoreItemRepository.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\SecurityConfig.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\controller\RazorpayWebhookController.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\config\CorsFilter.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\repository\WalletRepository.java
+C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\entity\StoreItem.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\entity\User.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\repository\RewardTransactionRepository.java
 C:\Users\bhatn\IdeaProjects\rewardKing\src\main\java\com\bhatn\rewardking\dto\PayoutStatusResponse.java

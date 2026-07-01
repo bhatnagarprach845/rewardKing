@@ -18,7 +18,7 @@ public class StreamLambdaHandler implements RequestStreamHandler {
 
     static {
         try {
-            // 2. Instantiate the V2-specific handler matching the modern API/Function URL structure
+            /// 2. Instantiate the V2-specific handler matching the modern API/Function URL structure
             handler = SpringBootLambdaContainerHandler.getHttpApiV2ProxyHandler(RewardKingApplication.class);
             // Core Fix: Instruct the proxy to read multipart content natively as raw binary data
             handler.getContainerConfig().addBinaryContentTypes("multipart/form-data");

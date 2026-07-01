@@ -21,7 +21,7 @@ const AdminDashboard = () => {
             ]);
 
             setWallets(walletRes.data.content || []);
-            setTotalPages(walletPage.data.totalPages || 1);
+            setTotalPages(walletRes.data.totalPages || 1);
             setPayouts(payoutRes.data || []);
         } catch (err) {
             console.error("Dashboard failed administrative pagination streams:", err);

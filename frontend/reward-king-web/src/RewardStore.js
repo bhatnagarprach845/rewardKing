@@ -21,9 +21,8 @@ const RewardStore = () => {
                 setUserPoints(walletRes.data.currentBalance || walletRes.data.availablePoints || 0);
                 setCatalog(Array.isArray(catalogRes.data) ? catalogRes.data : []);
 
-                // 🚀 UX PROMPT COMPLETENESS GUARD CHECK
                 const p = profileRes.data;
-                if (!p.address || !p.phoneNumber) {
+                if (!p || !p.address || !p.phoneNumber) {
                     setProfileComplete(false);
                 }
             } catch (err) {
@@ -51,7 +50,6 @@ const RewardStore = () => {
         }
     };
 
-    // 🚀 NEW: Function to remove a single unit or an item entirely from the cart
     const removeFromCart = (itemId) => {
         const existingItem = cart.find(i => i.itemId === itemId);
         if (!existingItem) return;
@@ -66,7 +64,6 @@ const RewardStore = () => {
     const getCartTotal = () => cart.reduce((sum, item) => sum + (item.pointsCost * item.quantity), 0);
 
     const handleCheckout = async () => {
-        // 🚀 PREVENT CHECKOUT IF ADDRESS IS BLANK
         if (!profileComplete) {
             alert("⚠️ Missing Shipping Information! Please navigate to your Profile page to save an address and phone number before completing your order.");
             window.location.href = '/profile';
@@ -120,38 +117,44 @@ const RewardStore = () => {
                     <div style={styles.grid}>
                         {catalog.map(item => {
                             const isOutOfStock = item.stockLevel <= 0;
-                            // 🚀 IMPROVED VISUAL UNIFORMITY FOR UNAVAILABLE ITEMS
-                                const dynamicCardStyle = {
-                                    ...styles.catalogCard,
-                                    border: isOutOfStock ? '1px solid #dc3545' : (canAfford ? '2px solid #28a745' : '1px solid #ddd'),
-                                    boxShadow: (!isOutOfStock && canAfford) ? '0 4px 12px rgba(40, 167, 69, 0.15)' : 'none',
-                                    backgroundColor: (isOutOfStock || !canAfford) ? '#f8f9fa' : '#fff', // Light grey out
-                                    opacity: (isOutOfStock || !canAfford) ? 0.6 : 1, // Visual fade
-                                    cursor: (isOutOfStock || !canAfford) ? 'not-allowed' : 'default'
-                                };
+                            // 🚀 COGNIZANT FIX: canAfford is declared inside the map loop before it is read by style attributes
+                            const canAfford = userPoints >= item.pointsCost;
+
+                            const dynamicCardStyle = {
+                                ...styles.catalogCard,
+                                border: isOutOfStock ? '1px solid #dc3545' : (canAfford ? '2px solid #28a745' : '1px solid #ddd'),
+                                boxShadow: (!isOutOfStock && canAfford) ? '0 4px 12px rgba(40, 167, 69, 0.15)' : 'none',
+                                backgroundColor: (isOutOfStock || !canAfford) ? '#f8f9fa' : '#fff',
+                                opacity: (isOutOfStock || !canAfford) ? 0.6 : 1,
+                                cursor: (isOutOfStock || !canAfford) ? 'not-allowed' : 'default'
+                            };
 
                             return (
                                 <div key={item.itemId} style={dynamicCardStyle}>
                                     <div style={styles.itemImage}>{item.imageEmoji}</div>
                                     <h3 style={styles.itemName}>{item.name}</h3>
                                     <p style={styles.itemDesc}>{item.description}</p>
-                                    <p style={{fontSize: '11px', color: isOutOfStock ? '#dc3545' : '#888'}}>Stock: {item.stockLevel} left</p>
+                                    <p style={{fontSize: '11px', color: isOutOfStock ? '#dc3545' : '#888', fontWeight: 'bold'}}>
+                                        Stock: {item.stockLevel} left
+                                    </p>
                                     <div style={styles.actionRow}>
-                                        <span style={styles.priceTag}>{item.pointsCost} pts</span>
+                                        <span style={{...styles.priceTag, color: canAfford ? '#28a745' : '#dc3545'}}>
+                                            {item.pointsCost} pts
+                                        </span>
+
                                         <button
-                                        // 🚀 DOUBLE LOCK SAFETIES: Blocks programmatic entry AND pointer interactions
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (!isOutOfStock && canAfford) addToCart(item);
-                                                }}
-                                                disabled={isOutOfStock || !canAfford}
-                                                style={{
-                                                    ...styles.addToCartBtn,
-                                                    backgroundColor: isOutOfStock ? '#ccc' : (!canAfford ? '#dc3545' : '#007bff'),
-                                                    cursor: (isOutOfStock || !canAfford) ? 'not-allowed' : 'pointer'
-                                                }}
-                                            >
-                                            {isOutOfStock ? 'Out of Stock' : '+ Add to Cart'}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!isOutOfStock && canAfford) addToCart(item);
+                                            }}
+                                            disabled={isOutOfStock || !canAfford}
+                                            style={{
+                                                ...styles.addToCartBtn,
+                                                backgroundColor: isOutOfStock ? '#ccc' : (!canAfford ? '#dc3545' : '#007bff'),
+                                                cursor: (isOutOfStock || !canAfford) ? 'not-allowed' : 'pointer'
+                                            }}
+                                        >
+                                            {isOutOfStock ? 'Out of Stock' : (!canAfford ? 'Low Balance' : '+ Add to Cart')}
                                         </button>
                                     </div>
                                 </div>
@@ -169,7 +172,6 @@ const RewardStore = () => {
                                 <strong>{i.name}</strong>
                                 <div style={{ color: '#666', fontSize: '11px' }}>Qty: {i.quantity} ({i.pointsCost * i.quantity} pts)</div>
                             </div>
-                            {/* 🚀 NEW: Delete/Remove Single Action Button */}
                             <button
                                 onClick={() => removeFromCart(i.itemId)}
                                 style={styles.removeBtn}
@@ -207,10 +209,10 @@ const styles = {
     itemName: { fontSize: '15px', fontWeight: 'bold' },
     itemDesc: { fontSize: '12px', color: '#666', flexGrow: 1 },
     actionRow: { display: 'flex', justifyContent: 'space-between', marginTop: '15px', alignItems: 'center' },
-    priceTag: { fontWeight: 'bold', color: '#28a745' },
-    addToCartBtn: { color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
+    priceTag: { fontWeight: 'bold' },
+    addToCartBtn: { color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold' },
     cartRow: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #ddd', fontSize: '13px', alignItems: 'center' },
-    removeBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '5px', borderRadius: '4px', transition: 'background 0.2s', ':hover': { background: '#eee' } },
+    removeBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '5px', borderRadius: '4px' },
     checkoutBtn: { width: '100%', backgroundColor: '#28a745', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', marginTop: '15px', fontWeight: 'bold', cursor: 'pointer' }
 };
 

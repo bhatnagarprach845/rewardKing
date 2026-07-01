@@ -16,8 +16,8 @@ const AdminDashboard = () => {
         try {
             // 🚀 PAGINATED REQUEST ROUTED FOR LOAD BALANCE PROTECTION
             const [walletRes, payoutRes] = await Promise.all([
-                apiClient.get(`/admin/wallets?page=${currentPage}&size=10`),
-                apiClient.get('/admin/payouts')
+                apiClient.get(`api/v1//admin/wallets?page=${currentPage}&size=10`),
+                apiClient.get('api/v1/admin/payouts')
             ]);
 
             setWallets(walletRes.data.content || []);
@@ -33,7 +33,7 @@ const AdminDashboard = () => {
     const handleUpdateStatus = async (transactionId, newStatus) => {
         try {
             // 🚀 PASS TRACKING CODES FOR LOGISTICS UPDATES DYNAMICALLY
-            await apiClient.post(`/payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
+            await apiClient.post(`api/v1//payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
             alert("Order updated successfully!");
             setTrackingInput('');
             fetchInitialData();

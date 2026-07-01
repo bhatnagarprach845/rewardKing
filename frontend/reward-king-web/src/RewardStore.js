@@ -13,9 +13,9 @@ const RewardStore = () => {
         const loadInitialStoreContext = async () => {
             try {
                 const [walletRes, catalogRes, profileRes] = await Promise.all([
-                    apiClient.get('/payout-status'),
-                    apiClient.get('/store/items'),
-                    apiClient.get('/users/profile')
+                    apiClient.get('api/v1/payout-status'),
+                    apiClient.get('api/v1/store/items'),
+                    apiClient.get('api/v1/users/profile')
                 ]);
 
                 setUserPoints(walletRes.data.currentBalance || walletRes.data.availablePoints || 0);
@@ -72,14 +72,14 @@ const RewardStore = () => {
 
         try {
             const itemsPayload = cart.map(i => ({ itemId: i.itemId, quantity: i.quantity, pointsCost: i.pointsCost }));
-            await apiClient.post('/redeem-points', { items: itemsPayload });
+            await apiClient.post('api/v1/redeem-points', { items: itemsPayload });
 
             alert("🎉 Basket verified! Your items have shifted to active fulfillment tracking pipelines.");
             setUserPoints(prev => prev - totalCost);
             setCart([]);
 
             // Reload catalog to refresh stock allocations
-            const freshCatalog = await apiClient.get('/store/items');
+            const freshCatalog = await apiClient.get('api/v1/store/items');
             setCatalog(freshCatalog.data);
         } catch (e) {
             alert("Checkout processing transaction failed.");

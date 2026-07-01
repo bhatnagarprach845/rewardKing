@@ -8,7 +8,7 @@ const Dashboard = ({ refreshTrigger, username }) => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const res = await apiClient.get('/payout-status');
+                const res = await apiClient.get('/api/v1/payout-status');
                 setData(res.data);
             } catch (err) {
                 console.error("Failed to load dashboard balances:", err);

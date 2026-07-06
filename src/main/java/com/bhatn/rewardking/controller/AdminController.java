@@ -2,16 +2,11 @@ package com.bhatn.rewardking.controller;
 
 import com.bhatn.rewardking.dto.AdminWalletDTO;
 import com.bhatn.rewardking.dto.PayoutDTO;
-import com.bhatn.rewardking.entity.Receipt;
-import com.bhatn.rewardking.entity.RewardTransaction;
-import com.bhatn.rewardking.entity.User;
-import com.bhatn.rewardking.entity.UserWallet;
-import com.bhatn.rewardking.repository.ReceiptRepository;
-import com.bhatn.rewardking.repository.RewardTransactionRepository;
-import com.bhatn.rewardking.repository.UserRepository;
-import com.bhatn.rewardking.repository.WalletRepository;
+import com.bhatn.rewardking.entity.*;
+import com.bhatn.rewardking.repository.*;
 import com.bhatn.rewardking.service.RewardService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,11 +22,13 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@Slf4j
 public class AdminController {
 
     private final WalletRepository walletRepository;
     private final UserRepository userRepository;
     private final ReceiptRepository receiptRepository;
+    private final StoreItemRepository storeItemRepository;
     private final RewardTransactionRepository transactionRepository;
     private final RewardService rewardService;
 
@@ -60,6 +57,39 @@ public class AdminController {
                     .notes(tx.getNotes()) // 🚀 FIX 1: Map notes so the frontend has item descriptions!
                     .build();
         }).toList();
+    }
+
+    // Add this endpoint inside your com.bhatn.rewardking.controller.AdminController class
+
+    @PostMapping("/store/items/manage")
+    public ResponseEntity<?> manageCatalogItem(
+            @RequestParam(required = false) String itemId,
+            @RequestParam String name,
+            @RequestParam String description,
+            @RequestParam Long pointsCost,
+            @RequestParam Integer stockLevel,
+            @RequestParam String imageEmoji) {
+        try {
+            // If itemId is provided, look it up for an update; otherwise, create a new one
+            String targetId = (itemId != null && !itemId.trim().isEmpty()) ? itemId.trim() : "item_" + System.currentTimeMillis();
+
+            StoreItem item = storeItemRepository.findById(targetId)
+                    .orElse(new StoreItem());
+
+            item.setItemId(targetId);
+            item.setName(name.trim());
+            item.setDescription(description.trim());
+            item.setPointsCost(pointsCost);
+            item.setStockLevel(stockLevel);
+            item.setImageEmoji(imageEmoji.trim());
+
+            storeItemRepository.save(item);
+            log.info("Admin successfully managed catalog item: {}", targetId);
+
+            return ResponseEntity.ok(Map.of("status", "SUCCESS", "itemId", targetId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to update catalog structure: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/payouts/update-status/{transactionId}")

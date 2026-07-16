@@ -42,16 +42,20 @@ const FileUpload2 = (props) => {
                 }
 
                 const currentStatus = data.status;
+                const reason = data.reason;
 
                 if (currentStatus === "PROCESSED") {
                     setStatus("Success! Reward added to your wallet.");
                     if (props.onUploadSuccess) props.onUploadSuccess();
                     clearInterval(pollingIntervalRef.current);
                 } else if (currentStatus === "REJECTED") {
-                    setStatus("Duplicate Detected! This bill has already been rewarded.");
+                    setStatus(reason || "This bill could not be accepted.");
                     clearInterval(pollingIntervalRef.current);
                 } else if (currentStatus === "FLAGGED_FOR_REVIEW") {
-                    setStatus("Receipt captured! Processing pending verification review.");
+                    setStatus(reason || "Receipt captured! Processing pending verification review.");
+                    clearInterval(pollingIntervalRef.current);
+                } else if (currentStatus === "FAILED") {
+                    setStatus(reason || "Something went wrong while processing this receipt.");
                     clearInterval(pollingIntervalRef.current);
                 }
             } catch (err) {

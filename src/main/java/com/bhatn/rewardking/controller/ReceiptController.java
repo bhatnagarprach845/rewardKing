@@ -182,7 +182,8 @@ public class ReceiptController {
                 .map(receipt -> ResponseEntity.ok(Map.<String, Object>of(
                         "id", receipt.getId(),
                         "status", receipt.getStatus().name(),
-                        "merchant", receipt.getMerchantName() != null ? receipt.getMerchantName() : ""
+                        "merchant", receipt.getMerchantName() != null ? receipt.getMerchantName() : "",
+                        "reason", receipt.getStatusReason() != null ? receipt.getStatusReason() : ""
                 )))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.<String, Object>of("error", "Receipt not found")));
     }

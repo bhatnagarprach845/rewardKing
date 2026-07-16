@@ -56,6 +56,9 @@ public class BillAnalyzer {
         String rawMerchant = getField(summaryFields, "VENDOR_NAME");
         String totalStr = getField(summaryFields, "TOTAL");
         String dateStr = getField(summaryFields, "INVOICE_RECEIPT_DATE");
+        String taxStr = getField(summaryFields, "TAX");
+        String tipStr = getField(summaryFields, "TIP");
+        String gratuityStr = getField(summaryFields, "GRATUITY");
 
         // Tier 2 & 3: Fall back to top-of-page raw geometry if prediction is absent or contains layout noise
         if (rawMerchant == null || isNoise(rawMerchant)) {
@@ -86,6 +89,8 @@ public class BillAnalyzer {
                 .totalAmount(parseAmount(totalStr))
                 .purchaseDate(purchaseDate)
                 .lineItems(items)
+                .taxAmount(parseAmount(taxStr))
+                .tipAmount(tipStr != null ? parseAmount(tipStr) : parseAmount(gratuityStr))
                 .build();
     }
 

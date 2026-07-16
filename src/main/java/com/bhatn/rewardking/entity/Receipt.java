@@ -25,9 +25,14 @@ public class Receipt {
     // Add this field to fix the error
     private String merchantZipCode;
     private BigDecimal totalAmount;
+    private BigDecimal taxAmount;
+    private BigDecimal tipAmount;
     private LocalDate purchaseDate;
     private String fingerprintHash;
     private String s3Key;
+
+    // Human-readable explanation of the current status (why it was rejected/flagged)
+    private String statusReason;
 
     // The missing piece: Tracks the lifecycle of the receipt
     @Enumerated(EnumType.STRING)

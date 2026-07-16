@@ -7,9 +7,6 @@ import com.bhatn.rewardking.repository.ReceiptRepository;
 import com.bhatn.rewardking.repository.RewardTransactionRepository;
 import com.bhatn.rewardking.repository.WalletRepository;
 import com.bhatn.rewardking.service.ocr.BillAnalyzer;
-import com.drew.imaging.ImageMetadataReader;
-import com.drew.metadata.Metadata;
-import com.drew.metadata.exif.ExifIFD0Directory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +19,6 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -58,17 +54,12 @@ public class ReceiptProcessor {
         try {
             byte[] imageBytes = downloadFromS3(bucket, key);
 
-            if (!isAuthenticCapture(imageBytes)) {
-                log.warn("EXIF data absent or incomplete for receipt {}. Flagging for manual review.", receiptId);
-                self.updateReceiptStatus(receiptId, ReceiptStatus.FLAGGED_FOR_REVIEW);
-                return;
-            }
-
             ExtractionResult result = billAnalyzer.analyze(imageBytes);
 
             if (result == null || result.getTotalAmount() == null || result.getMerchantName() == null) {
                 log.warn("OCR Parsing failed completely for receipt {}. Flagging for review.", receiptId);
-                self.updateReceiptStatus(receiptId, ReceiptStatus.FLAGGED_FOR_REVIEW);
+                self.updateReceiptStatus(receiptId, ReceiptStatus.FLAGGED_FOR_REVIEW,
+                        "We couldn't read this receipt clearly. It's been flagged for manual review.");
                 return;
             }
 
@@ -77,7 +68,8 @@ public class ReceiptProcessor {
         } catch (Exception e) {
             log.error("Async failure for receipt {}: {}", receiptId, e.getMessage(), e);
             try {
-                self.updateReceiptStatus(receiptId, ReceiptStatus.FAILED);
+                self.updateReceiptStatus(receiptId, ReceiptStatus.FAILED,
+                        "Something went wrong while processing this receipt. Please try again.");
             } catch (Exception ex) {
                 log.error("Failed to mark receipt status as FAILED in DB: {}", ex.getMessage());
             }
@@ -95,6 +87,8 @@ public class ReceiptProcessor {
         receipt.setMerchantName(result.getMerchantName().toUpperCase().trim());
         receipt.setTotalAmount(result.getTotalAmount());
         receipt.setPurchaseDate(result.getPurchaseDate());
+        receipt.setTaxAmount(result.getTaxAmount());
+        receipt.setTipAmount(result.getTipAmount());
 
         if (result.getLineItems() != null) {
             if (receipt.getItems() == null) {
@@ -111,7 +105,8 @@ public class ReceiptProcessor {
         }
 
         if (!verifyReceiptMath(receipt)) {
-            rejectReceipt(receipt, "FRAUD_ALERT: Total amount mismatched during line-item mathematical validation.");
+            rejectReceipt(receipt, "FRAUD_ALERT: Total amount mismatched during line-item mathematical validation.",
+                    "The item totals didn't match the receipt total. Please retake a clearer photo and try again.");
             return;
         }
 
@@ -119,9 +114,10 @@ public class ReceiptProcessor {
     }
 
     @Transactional
-    public void updateReceiptStatus(Long receiptId, ReceiptStatus status) {
+    public void updateReceiptStatus(Long receiptId, ReceiptStatus status, String reason) {
         receiptRepository.findById(receiptId).ifPresent(receipt -> {
             receipt.setStatus(status);
+            receipt.setStatusReason(reason);
             receipt.setItems(new java.util.ArrayList<>());
             receiptRepository.save(receipt);
         });
@@ -145,17 +141,20 @@ public class ReceiptProcessor {
                 log.warn("CRITICAL FRAUD ALERT: User {} uploaded a receipt identical to User {}",
                         receipt.getUserId(), existingReceipt.getUserId());
                 receipt.setStatus(ReceiptStatus.FLAGGED_FOR_REVIEW);
+                receipt.setStatusReason("Receipt flagged for manual review.");
                 receipt.setItems(new java.util.ArrayList<>());
                 receiptRepository.save(receipt);
                 return;
             } else {
-                rejectReceipt(receipt, "FRAUD_ALERT: Identity collision. Bill has already been processed by this account.");
+                rejectReceipt(receipt, "FRAUD_ALERT: Identity collision. Bill has already been processed by this account.",
+                        "This bill has already been rewarded on your account.");
                 return;
             }
         }
 
         if (isDuplicate(receipt)) {
-            rejectReceipt(receipt, "FRAUD_ALERT: Deep item matches indicate duplicated receipt content profiles.");
+            rejectReceipt(receipt, "FRAUD_ALERT: Deep item matches indicate duplicated receipt content profiles.",
+                    "This bill appears to duplicate a previous submission.");
             return;
         }
 
@@ -227,37 +226,12 @@ public class ReceiptProcessor {
         }
     }
 
-    private void rejectReceipt(Receipt receipt, String reason) {
-        log.warn("{} for User: {}", reason, receipt.getUserId());
+    private void rejectReceipt(Receipt receipt, String logReason, String userReason) {
+        log.warn("{} for User: {}", logReason, receipt.getUserId());
         receipt.setStatus(ReceiptStatus.REJECTED);
+        receipt.setStatusReason(userReason);
         receipt.setItems(new java.util.ArrayList<>());
         receiptRepository.save(receipt);
-    }
-
-    private boolean isAuthenticCapture(byte[] imageBytes) {
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(imageBytes)) {
-            Metadata metadata = ImageMetadataReader.readMetadata(bais);
-            ExifIFD0Directory exifDir = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-
-            if (exifDir == null) {
-                log.warn("EXIF directory absent. Possible web screenshot or AI render.");
-                return false;
-            }
-
-            String cameraMake = exifDir.getString(ExifIFD0Directory.TAG_MAKE);
-            String cameraModel = exifDir.getString(ExifIFD0Directory.TAG_MODEL);
-
-            if (cameraMake == null || cameraModel == null) {
-                log.warn("Camera hardware identity elements null. EXIF metadata incomplete.");
-                return false;
-            }
-
-            log.info("EXIF verification success. Capture device: {} {}", cameraMake, cameraModel);
-            return true;
-        } catch (Exception e) {
-            log.warn("Failed to inspect EXIF metadata. Treating as unverifiable.");
-            return false;
-        }
     }
 
     private boolean verifyReceiptMath(Receipt receipt) {
@@ -271,13 +245,19 @@ public class ReceiptProcessor {
             BigDecimal itemTotal = item.getUnitPrice().multiply(qty);
             calculatedTotal = calculatedTotal.add(itemTotal);
         }
+        if (receipt.getTaxAmount() != null) {
+            calculatedTotal = calculatedTotal.add(receipt.getTaxAmount());
+        }
+        if (receipt.getTipAmount() != null) {
+            calculatedTotal = calculatedTotal.add(receipt.getTipAmount());
+        }
 
         BigDecimal variance = receipt.getTotalAmount().subtract(calculatedTotal).abs();
         boolean mathIsValid = variance.compareTo(new BigDecimal("5.00")) <= 0;
 
         if (!mathIsValid) {
-            log.error("Math verification failed. Invoice total ₹{}, computed total ₹{}",
-                    receipt.getTotalAmount(), calculatedTotal);
+            log.error("Math verification failed. Invoice total {}, computed total {} (items + tax {} + tip {})",
+                    receipt.getTotalAmount(), calculatedTotal, receipt.getTaxAmount(), receipt.getTipAmount());
         }
         return mathIsValid;
     }

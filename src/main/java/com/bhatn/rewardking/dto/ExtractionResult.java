@@ -14,6 +14,11 @@ public class ExtractionResult {
     private LocalDate purchaseDate;
     private String rawText; // Useful for deep analytics later
 
+    @Builder.Default
+    private BigDecimal taxAmount = BigDecimal.ZERO;
+    @Builder.Default
+    private BigDecimal tipAmount = BigDecimal.ZERO;
+
     // NEW: List of individual items from the bill
     private List<LineItemDTO> lineItems;
 

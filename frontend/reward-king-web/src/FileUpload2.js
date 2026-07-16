@@ -72,33 +72,15 @@ const FileUpload2 = (props) => {
             const session = await fetchAuthSession();
             const token = session.tokens?.accessToken?.toString();
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-            const contentType = file.type || 'image/jpeg';
 
-            // 1. Ask the backend for a short-lived presigned S3 upload URL
-            const presignResponse = await axios.post(
-                `${apiUrl}/api/v1/receipts/presign-upload`,
-                null,
-                {
-                    params: { contentType },
-                    headers: { 'Authorization': `Bearer ${token}` }
-                }
-            );
+            const formData = new FormData();
+            formData.append("file", file);
 
-            let presignData = presignResponse.data;
-            if (typeof presignData.body === 'string') {
-                presignData = JSON.parse(presignData.body);
-            }
-            const { uploadUrl, key } = presignData;
-
-            // 2. Upload the raw image bytes straight to S3 (no auth header - must match what was signed)
-            await axios.put(uploadUrl, file, {
-                headers: { 'Content-Type': contentType }
-            });
-
-            // 3. Now that the file is in S3, kick off async OCR + reward processing
+            // Upload straight to the backend, which stores it in S3 itself and
+            // kicks off async OCR + reward processing.
             const processResponse = await axios.post(
-                `${apiUrl}/api/v1/process-s3`,
-                { s3Key: key },
+                `${apiUrl}/api/v1/receipts/upload`,
+                formData,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
 

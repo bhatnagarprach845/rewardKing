@@ -15,12 +15,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,54 +31,68 @@ public class ReceiptController {
     private final ReceiptProcessor receiptProcessor;
     private final ReceiptRepository receiptRepository;
     private final BillAnalyzer billAnalyzer;
-    private final S3Presigner s3Presigner;
+    private final S3Client s3Client;
     private final String bucketName;
 
     public ReceiptController(
             ReceiptProcessor receiptProcessor,
             ReceiptRepository receiptRepository,
             BillAnalyzer billAnalyzer,
-            S3Presigner s3Presigner,
+            S3Client s3Client,
             @Value("${aws.s3.bucket}") String bucketName) {
         this.receiptProcessor = receiptProcessor;
         this.receiptRepository = receiptRepository;
         this.billAnalyzer = billAnalyzer;
-        this.s3Presigner = s3Presigner;
+        this.s3Client = s3Client;
         this.bucketName = bucketName;
     }
 
     /**
-     * 0. Issues a short-lived presigned S3 PUT URL so the client can upload the
-     * receipt image directly to S3, ahead of calling /process-s3.
+     * 0. Production upload pathway: the client posts the image directly to the
+     * Lambda (multipart), which stores it in S3 itself (no presigned URL - the
+     * Lambda already holds valid credentials) and kicks off the same async
+     * OCR/fraud-detection/reward pipeline used by the S3 flow.
      */
-    @PostMapping("/receipts/presign-upload")
-    public ResponseEntity<Map<String, String>> presignUpload(
-            @RequestParam(defaultValue = "image/jpeg") String contentType,
+    @PostMapping("/receipts/upload")
+    public ResponseEntity<Map<String, Object>> uploadReceipt(
+            @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getClaimAsString("sub");
-        String key = "receipts/" + username + "/" + UUID.randomUUID();
+        String s3Key = "receipts/" + username + "/" + UUID.randomUUID();
 
-        PutObjectRequest objectRequest = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .contentType(contentType)
-                .build();
+        try {
+            byte[] imageBytes = file.getInputStream().readAllBytes();
 
-        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(5))
-                .putObjectRequest(objectRequest)
-                .build();
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(s3Key)
+                            .contentType(file.getContentType())
+                            .build(),
+                    software.amazon.awssdk.core.sync.RequestBody.fromBytes(imageBytes)
+            );
 
-        PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+            Receipt receipt = new Receipt();
+            receipt.setUserId(username);
+            receipt.setS3Key(s3Key);
+            receipt.setStatus(ReceiptStatus.PROCESSING);
 
-        return ResponseEntity.ok(Map.of(
-                "uploadUrl", presignedRequest.url().toString(),
-                "key", key
-        ));
+            receipt = receiptRepository.saveAndFlush(receipt);
+            receiptProcessor.processRewardAsync(receipt.getId(), bucketName, s3Key);
+
+            return ResponseEntity.ok(Map.of(
+                    "receiptId", receipt.getId(),
+                    "status", "PROCESSING_INITIATED"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to upload receipt to S3 for user {}:", username, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to store receipt image"));
+        }
     }
 
     /**
-     * 1. Production S3 Processing Pathway
+     * 1. Production S3 Processing Pathway (used when the client already has an
+     * s3Key, e.g. from a direct S3 upload elsewhere).
      */
     @PostMapping("/process-s3")
     public ResponseEntity<Map<String, Object>> processS3Receipt(
@@ -158,7 +169,7 @@ public class ReceiptController {
 
     /**
      * 3. Lets the client poll a receipt's OCR/reward processing status after
-     * kicking off /process-s3.
+     * kicking off /receipts/upload or /process-s3.
      */
     @GetMapping("/receipts/{id}/status")
     public ResponseEntity<Map<String, Object>> getReceiptStatus(

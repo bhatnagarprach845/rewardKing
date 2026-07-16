@@ -73,18 +73,23 @@ public class RewardService {
 
     @Transactional
     public void processBulkCartRedemption(String userId, List<RedeemPointsRequest.CartItemDTO> cartItems) {
-        UserWallet wallet = walletRepository.findByUserId(userId)
+        // Lock the wallet row for the duration of the checkout so concurrent
+        // redemptions can't both read the same balance before either commits.
+        UserWallet wallet = walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid user profile instance."));
 
         long totalCartCost = 0;
+        Map<String, StoreItem> lockedItems = new HashMap<>();
         for (RedeemPointsRequest.CartItemDTO item : cartItems) {
-            StoreItem storeItem = storeItemRepository.findById(item.getItemId())
+            // Lock each store item row too, so concurrent checkouts can't oversell the same stock.
+            StoreItem storeItem = storeItemRepository.findByIdForUpdate(item.getItemId())
                     .orElseThrow(() -> new IllegalArgumentException("Item not found: " + item.getItemId()));
 
             if (storeItem.getStockLevel() < item.getQuantity()) {
                 throw new IllegalArgumentException("Item out of stock: " + storeItem.getName());
             }
             totalCartCost += storeItem.getPointsCost() * item.getQuantity();
+            lockedItems.put(item.getItemId(), storeItem);
         }
 
         if (wallet.getAvailablePoints() < totalCartCost) {
@@ -95,7 +100,7 @@ public class RewardService {
         walletRepository.save(wallet);
 
         for (RedeemPointsRequest.CartItemDTO item : cartItems) {
-            StoreItem storeItem = storeItemRepository.findById(item.getItemId()).get();
+            StoreItem storeItem = lockedItems.get(item.getItemId());
 
             storeItem.setStockLevel(storeItem.getStockLevel() - item.getQuantity());
             storeItemRepository.save(storeItem);

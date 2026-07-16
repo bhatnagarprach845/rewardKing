@@ -1,0 +1,17 @@
+# IDE
+.idea/
+*.iml
+
+# Maven
+target/
+
+# Gradle (unused by this project's build/deploy pipeline)
+.gradle/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

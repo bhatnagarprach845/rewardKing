@@ -16,7 +16,6 @@ import java.util.Map;
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "*")
 public class RewardController {
 
     private final RewardService rewardService;
@@ -42,23 +41,6 @@ public class RewardController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-
-/*
-    @PostMapping("/payouts/update-status/{transactionId}")
-    public ResponseEntity<?> updateOrderStatus(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long transactionId,
-            @RequestParam String newStatus,
-            @RequestParam(required = false) String trackingNumber) {
-        if (jwt == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized."));
-
-        try {
-            rewardService.updateOrderStatusWithTracking(transactionId, newStatus, trackingNumber);
-            return ResponseEntity.ok(Map.of("status", "SUCCESS"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }*/
 
     @GetMapping("/payout-status")
     public ResponseEntity<?> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {

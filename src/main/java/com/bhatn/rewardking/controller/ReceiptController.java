@@ -6,7 +6,6 @@ import com.bhatn.rewardking.entity.ReceiptItem;
 import com.bhatn.rewardking.entity.ReceiptStatus;
 import com.bhatn.rewardking.repository.ReceiptRepository;
 import com.bhatn.rewardking.service.ReceiptProcessor;
-import com.bhatn.rewardking.service.RewardService;
 import com.bhatn.rewardking.service.ocr.BillAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +15,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,21 +33,51 @@ public class ReceiptController {
 
     private final ReceiptProcessor receiptProcessor;
     private final ReceiptRepository receiptRepository;
-    private final RewardService rewardService;
     private final BillAnalyzer billAnalyzer;
+    private final S3Presigner s3Presigner;
     private final String bucketName;
 
     public ReceiptController(
             ReceiptProcessor receiptProcessor,
             ReceiptRepository receiptRepository,
-            RewardService rewardService,
             BillAnalyzer billAnalyzer,
+            S3Presigner s3Presigner,
             @Value("${aws.s3.bucket}") String bucketName) {
         this.receiptProcessor = receiptProcessor;
         this.receiptRepository = receiptRepository;
-        this.rewardService = rewardService;
         this.billAnalyzer = billAnalyzer;
+        this.s3Presigner = s3Presigner;
         this.bucketName = bucketName;
+    }
+
+    /**
+     * 0. Issues a short-lived presigned S3 PUT URL so the client can upload the
+     * receipt image directly to S3, ahead of calling /process-s3.
+     */
+    @PostMapping("/receipts/presign-upload")
+    public ResponseEntity<Map<String, String>> presignUpload(
+            @RequestParam(defaultValue = "image/jpeg") String contentType,
+            @AuthenticationPrincipal Jwt jwt) {
+        String username = jwt.getClaimAsString("sub");
+        String key = "receipts/" + username + "/" + UUID.randomUUID();
+
+        PutObjectRequest objectRequest = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .contentType(contentType)
+                .build();
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(5))
+                .putObjectRequest(objectRequest)
+                .build();
+
+        PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+
+        return ResponseEntity.ok(Map.of(
+                "uploadUrl", presignedRequest.url().toString(),
+                "key", key
+        ));
     }
 
     /**
@@ -123,19 +157,24 @@ public class ReceiptController {
     }
 
     /**
-     * 3. Points Status Aggregator Endpoint (Connects straight to your updated RewardStore dashboard)
+     * 3. Lets the client poll a receipt's OCR/reward processing status after
+     * kicking off /process-s3.
      */
-   /* @GetMapping("/payout-status")
-    public ResponseEntity<PayoutStatusResponse> getPayoutStatus(@AuthenticationPrincipal Jwt jwt) {
+    @GetMapping("/receipts/{id}/status")
+    public ResponseEntity<Map<String, Object>> getReceiptStatus(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getClaimAsString("sub");
-        if (username == null) {
-            username = jwt.getClaimAsString("username");
-        }
 
-        // Handoff directly to your revised RewardService business layer instance
-        PayoutStatusResponse response = rewardService.getUserPointsDashboard(username);
-        return ResponseEntity.ok(response);
-    }*/
+        return receiptRepository.findById(id)
+                .filter(receipt -> receipt.getUserId().equals(username))
+                .map(receipt -> ResponseEntity.ok(Map.<String, Object>of(
+                        "id", receipt.getId(),
+                        "status", receipt.getStatus().name(),
+                        "merchant", receipt.getMerchantName() != null ? receipt.getMerchantName() : ""
+                )))
+                .orElseGet(() -> ResponseEntity.status(404).body(Map.<String, Object>of("error", "Receipt not found")));
+    }
 
     @GetMapping("/version")
     public String version() {

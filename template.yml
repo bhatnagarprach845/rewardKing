@@ -12,6 +12,8 @@ Globals:
         DB_URL: 'jdbc:postgresql://your-supabase-url:5432/postgres'
         DB_USERNAME: 'postgres'
         DB_PASSWORD: 'your-supabase-password'
+        # Excludes DataInitializer's local test-user/wallet seed (@Profile("!prod")) from production
+        SPRING_PROFILES_ACTIVE: 'prod'
 
 Resources:
   RewardKingFunction:

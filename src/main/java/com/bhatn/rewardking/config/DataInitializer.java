@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 @Slf4j // FIX 2: Added annotation to dynamically inject the 'log' handle bean instance
-@Profile("default")
+@Profile("!prod")
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepo;

@@ -27,7 +27,7 @@ const FileUpload2 = (props) => {
     const pollReceiptStatus = async (receiptId) => {
         const session = await fetchAuthSession();
         const token = session.tokens?.accessToken?.toString();
-        const apiUrl = process.env.REACT_APP_API_URL;
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
         pollingIntervalRef.current = setInterval(async () => {
             try {
@@ -35,7 +35,13 @@ const FileUpload2 = (props) => {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                const currentStatus = res.data.status;
+                // Unbox AWS Lambda proxy payload wrappers ({ statusCode, body: "<json>" })
+                let data = res.data;
+                if (typeof data.body === 'string') {
+                    data = JSON.parse(data.body);
+                }
+
+                const currentStatus = data.status;
 
                 if (currentStatus === "PROCESSED") {
                     setStatus("Success! Reward added to your wallet.");
@@ -60,41 +66,52 @@ const FileUpload2 = (props) => {
         if (!file) return alert("Please snap a photo of your receipt first!");
         if (status === "Uploading..." || status.startsWith("Analyzing")) return;
 
-        const formData = new FormData();
-        formData.append("file", file);
-
         setStatus("Uploading...");
 
         try {
             const session = await fetchAuthSession();
             const token = session.tokens?.accessToken?.toString();
-            const apiUrl = process.env.REACT_APP_API_URL;
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const contentType = file.type || 'image/jpeg';
 
-            const response = await axios.post(`${apiUrl}/api/v1/upload`, formData, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data'
+            // 1. Ask the backend for a short-lived presigned S3 upload URL
+            const presignResponse = await axios.post(
+                `${apiUrl}/api/v1/receipts/presign-upload`,
+                null,
+                {
+                    params: { contentType },
+                    headers: { 'Authorization': `Bearer ${token}` }
                 }
+            );
+
+            let presignData = presignResponse.data;
+            if (typeof presignData.body === 'string') {
+                presignData = JSON.parse(presignData.body);
+            }
+            const { uploadUrl, key } = presignData;
+
+            // 2. Upload the raw image bytes straight to S3 (no auth header - must match what was signed)
+            await axios.put(uploadUrl, file, {
+                headers: { 'Content-Type': contentType }
             });
 
-            const receiptStatus = response.data.status;
-            const receiptId = response.data.id;
+            // 3. Now that the file is in S3, kick off async OCR + reward processing
+            const processResponse = await axios.post(
+                `${apiUrl}/api/v1/process-s3`,
+                { s3Key: key },
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
 
-            if (receiptStatus === "PROCESSED") {
-                setStatus("Success! Reward added to your wallet.");
-                if (props.onUploadSuccess) props.onUploadSuccess();
-            } else if (receiptStatus === "REJECTED") {
-                setStatus("Duplicate Detected! This bill has already been rewarded.");
-            } else if (receiptStatus === "FLAGGED_FOR_REVIEW") {
-                setStatus("Receipt captured! Processing pending verification review.");
-            } else if (["SAVED", "PENDING", "PROCESSING"].includes(receiptStatus)) {
-                setStatus("Analyzing photo data... matching line items.");
-                pollReceiptStatus(receiptId);
-            } else {
-                setStatus("Bill processed with issues. Check history.");
+            let processData = processResponse.data;
+            if (typeof processData.body === 'string') {
+                processData = JSON.parse(processData.body);
             }
 
+            setStatus("Analyzing photo data... matching line items.");
+            pollReceiptStatus(processData.receiptId);
+
         } catch (error) {
+            console.error("Upload/process-s3 flow failed:", error);
             setStatus("Failed to upload.");
         }
     };

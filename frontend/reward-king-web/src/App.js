@@ -5,7 +5,7 @@ import { Authenticator } from '@aws-amplify/ui-react';
 import { Amplify } from 'aws-amplify';
 import '@aws-amplify/ui-react/styles.css';
 import Dashboard from './Dashboard';
-import FileUpload from './FileUpload';
+import FileUpload from './FileUpload2';
 import AdminDashboard from './AdminDashboard';
 import UserProfile from './UserProfile';
 import RewardStore from './RewardStore'; // 🚀 IMPORTED YOUR NEW COMPONENT

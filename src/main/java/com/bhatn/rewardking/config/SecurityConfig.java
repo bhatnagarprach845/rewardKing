@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -26,6 +27,13 @@ public class SecurityConfig {
         http
                 .cors(AbstractHttpConfigurer::disable) // CorsFilter above handles it
                 .csrf(AbstractHttpConfigurer::disable)
+                // This is a stateless bearer-token API - never create/read an HttpSession.
+                // Without this, denying an unauthenticated request makes Spring Security try
+                // to cache it via HttpSessionRequestCache.saveRequest(), which calls
+                // request.getSession() - and that throws inside aws-serverless-java-container's
+                // servlet adapter when running behind a Lambda Function URL (requestContext is
+                // null), crashing the request instead of returning a clean 401.
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints — order: most specific first
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()

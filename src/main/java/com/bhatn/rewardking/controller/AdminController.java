@@ -61,26 +61,21 @@ public class AdminController {
     // Add this endpoint inside your com.bhatn.rewardking.controller.AdminController class
 
     @PostMapping("/store/items/manage")
-    public ResponseEntity<?> manageCatalogItem(
-            @RequestParam(required = false) String itemId,
-            @RequestParam String name,
-            @RequestParam String description,
-            @RequestParam Long pointsCost,
-            @RequestParam Integer stockLevel,
-            @RequestParam String imageEmoji) {
+    public ResponseEntity<?> manageCatalogItem(@RequestBody ManageCatalogItemRequest request) {
         try {
             // If itemId is provided, look it up for an update; otherwise, create a new one
+            String itemId = request.itemId();
             String targetId = (itemId != null && !itemId.trim().isEmpty()) ? itemId.trim() : "item_" + System.currentTimeMillis();
 
             StoreItem item = storeItemRepository.findById(targetId)
                     .orElse(new StoreItem());
 
             item.setItemId(targetId);
-            item.setName(name.trim());
-            item.setDescription(description.trim());
-            item.setPointsCost(pointsCost);
-            item.setStockLevel(stockLevel);
-            item.setImageEmoji(imageEmoji.trim());
+            item.setName(request.name().trim());
+            item.setDescription(request.description().trim());
+            item.setPointsCost(request.pointsCost());
+            item.setStockLevel(request.stockLevel());
+            item.setImageEmoji(request.imageEmoji().trim());
 
             storeItemRepository.save(item);
             log.info("Admin successfully managed catalog item: {}", targetId);
@@ -91,17 +86,24 @@ public class AdminController {
         }
     }
 
+    public record ManageCatalogItemRequest(
+            String itemId, String name, String description,
+            Long pointsCost, Integer stockLevel, String imageEmoji) {
+    }
+
     @PostMapping("/payouts/update-status/{transactionId}")
     public ResponseEntity<?> updateOrderStatus(
             @PathVariable Long transactionId,
-            @RequestParam String newStatus,
-            @RequestParam(required = false) String trackingNumber) {
+            @RequestBody UpdateOrderStatusRequest request) {
         try {
-            rewardService.updateOrderStatusWithTracking(transactionId, newStatus, trackingNumber);
+            rewardService.updateOrderStatusWithTracking(transactionId, request.newStatus(), request.trackingNumber());
             return ResponseEntity.ok(Map.of("status", "SUCCESS"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    public record UpdateOrderStatusRequest(String newStatus, String trackingNumber) {
     }
 
     @GetMapping("/wallets")

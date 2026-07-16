@@ -47,7 +47,14 @@ const AdminDashboard = () => {
         }
 
         try {
-            await apiClient.post(`/admin/store/items/manage?itemId=${itemId}&name=${encodeURIComponent(name)}&description=${encodeURIComponent(description)}&pointsCost=${pointsCost}&stockLevel=${stockLevel}&imageEmoji=${encodeURIComponent(imageEmoji)}`);
+            await apiClient.post('/admin/store/items/manage', {
+                itemId,
+                name,
+                description,
+                pointsCost: Number(pointsCost),
+                stockLevel: Number(stockLevel),
+                imageEmoji
+            });
             alert("Catalog changes processed successfully!");
 
             // Reset form states
@@ -75,7 +82,10 @@ const AdminDashboard = () => {
 
     const handleUpdateStatus = async (transactionId, newStatus) => {
         try {
-            await apiClient.post(`/admin/payouts/update-status/${transactionId}?newStatus=${newStatus}&trackingNumber=${encodeURIComponent(trackingInput)}`);
+            await apiClient.post(`/admin/payouts/update-status/${transactionId}`, {
+                newStatus,
+                trackingNumber: trackingInput
+            });
             alert("Order status adjusted successfully!");
             setTrackingInput('');
             await fetchInitialData();
